@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abuzarban School Management System</title>
+    <link href="assets/plugins/fontawesome/css/all.min.css" rel="stylesheet" type="text/css">
+    <script src="assets/plugins/chartjs/chart.umd.min.js"></script>
+    <link href="assets/css/style.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+
+    <!-- Window Controls -->
+    <div class="window-controls" style="position: fixed; top: 10px; right: 20px; z-index: 10001; display: flex; gap: 8px;">
+        <button id="minimizeBtn" class="btn btn-ghost" title="Minimize" style="font-size: 1.2rem;">
+            <i class="fas fa-window-minimize"></i>
+        </button>
+        <button id="closeBtn" class="btn btn-ghost" title="Close" style="font-size: 1.2rem;">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <div class="theme-toggle">
+        <button class="btn btn-ghost" onclick="toggleTheme()">
+            <i class="fas fa-moon" id="theme-icon"></i>
+        </button>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Abuzarban School</span>
+                </div>
+            </div>
+            
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active" data-section="dashboard">
+                        <i class="fas fa-home nav-icon"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="students">
+                        <i class="fas fa-users nav-icon"></i>
+                        Students
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="classes">
+                        <i class="fas fa-chalkboard nav-icon"></i>
+                        Classes
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="sessions">
+                        <i class="fas fa-calendar-alt nav-icon"></i>
+                        Sessions
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="payments">
+                        <i class="fas fa-credit-card nav-icon"></i>
+                        Record Payment
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="billing">
+                        <i class="fas fa-file-invoice nav-icon"></i>
+                        Billing
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="expenses">
+                        <i class="fas fa-receipt nav-icon"></i>
+                        Expenses
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="payment-categories">
+                        <i class="fas fa-tags nav-icon"></i>
+                        Payment Types
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="reports">
+                        <i class="fas fa-chart-bar nav-icon"></i>
+                        Reports
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="settings">
+                        <i class="fas fa-cog nav-icon"></i>
+                        Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Dashboard Section -->
+            <div id="dashboard-section" class="content-section active">
+                <div class="page-header">
+                    <h1 class="page-title">Dashboard</h1>
+                    <p class="page-subtitle">Overview of your school's financial performance</p>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-title">Total Revenue</div>
+                            <div class="stat-icon revenue">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="totalRevenue">₦125,430</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            +12.5% from last month
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-title">Total Expenses</div>
+                            <div class="stat-icon expenses">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="totalExpenses">₦45,680</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            +8.2% from last month
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-title">Outstanding Fees</div>
+                            <div class="stat-icon outstanding">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="outstandingFees">₦23,150</div>
+                        <div class="stat-change negative">
+                            <i class="fas fa-arrow-down"></i>
+                            -5.3% from last month
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-title">Active Students</div>
+                            <div class="stat-icon students">
+                                <i class="fas fa-user-graduate"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value" id="activeStudents">342</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            +15 new this month
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="charts-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Revenue vs Expenses</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="chart-container">
+                                <canvas id="revenueExpenseChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Payment Status</h3>
+                        </div>
+                        <div class="card-content">
+                            <div class="chart-container">
+                                <canvas id="paymentStatusChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Recent Transactions</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="table" id="recentTransactionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Date <i class="fas fa-sort sort-icon" data-sort="date"></i></th>
+                                        <th>Student <i class="fas fa-sort sort-icon" data-sort="student"></i></th>
+                                        <th>Type <i class="fas fa-sort sort-icon" data-sort="type"></i></th>
+                                        <th>Amount <i class="fas fa-sort sort-icon" data-sort="amount"></i></th>
+                                        <th>Status <i class="fas fa-sort sort-icon" data-sort="status"></i></th>
+                                        <th>Method <i class="fas fa-sort sort-icon" data-sort="method"></i></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Data will be loaded dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Students Section -->
+            <div id="students-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Student Management</h1>
+                    <p class="page-subtitle">Manage student information and enrollment</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Students</h3>
+                        <button class="btn btn-primary" onclick="addStudent()">
+                            <i class="fas fa-plus"></i>
+                            Add Student
+                        </button>
+                    </div>
+                    <div class="card-content">
+                        <div class="form-group" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                            <input type="text" class="form-control" id="studentSearch" placeholder="Search students by name, ID, or guardian...">
+                            <select class="form-control" id="studentClassFilter" onchange="filterStudents()">
+                                <option value="">All Classes</option>
+                            </select>
+                            <button class="btn btn-ghost" onclick="sortStudents()">
+                                <i class="fas fa-sort"></i> Sort
+                            </button>
+                        </div>
+                        <div class="students-grid" id="studentsGrid">
+                            <!-- Students will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classes Section -->
+            <div id="classes-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Class Management</h1>
+                    <p class="page-subtitle">Manage school classes and their details</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Classes</h3>
+                        <button class="btn btn-primary" onclick="addClass()">
+                            <i class="fas fa-plus"></i>
+                            Add Class
+                        </button>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="table" id="classesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Class Name <i class="fas fa-sort sort-icon" data-sort="name"></i></th>
+                                        <th>Level <i class="fas fa-sort sort-icon" data-sort="level"></i></th>
+                                        <th>Students <i class="fas fa-sort sort-icon" data-sort="studentCount"></i></th>
+                                        <th>Teacher <i class="fas fa-sort sort-icon" data-sort="teacher"></i></th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="classesTableBody">
+                                    <!-- Classes will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sessions Section -->
+            <div id="sessions-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Academic Sessions</h1>
+                    <p class="page-subtitle">Manage academic sessions and terms</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Sessions</h3>
+                        <button class="btn btn-primary" onclick="addSession()">
+                            <i class="fas fa-plus"></i>
+                            Add Session
+                        </button>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="table" id="sessionsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Session <i class="fas fa-sort sort-icon" data-sort="name"></i></th>
+                                        <th>Start Date <i class="fas fa-sort sort-icon" data-sort="startDate"></i></th>
+                                        <th>End Date <i class="fas fa-sort sort-icon" data-sort="endDate"></i></th>
+                                        <th>Status <i class="fas fa-sort sort-icon" data-sort="status"></i></th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sessionsTableBody">
+                                    <!-- Sessions will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Recording Section -->
+            <div id="payments-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Record Payment</h1>
+                    <p class="page-subtitle">Process student payments</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-content">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                            <div>
+                                <h5 class="mb-3">Student Selection</h5>
+                                <div class="form-group">
+                                    <input type="text" class="form-control" id="paymentStudentSearch" placeholder="Search student by name or ID...">
+                                    <div id="studentSearchResults" class="search-results"></div>
+                                </div>
+                                <div id="selectedStudentInfo" class="mb-3"></div>
+                                
+                                <h5 class="mb-3">Payment Details</h5>
+                                <form id="paymentForm">
+                                    <div class="form-group">
+                                        <label>Payment Type</label>
+                                        <select class="form-control" id="paymentType">
+                                            <option value="">Select Payment Type</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Amount</label>
+                                        <input type="number" step="0.01" class="form-control" id="paymentAmount">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Payment Method</label>
+                                        <select class="form-control" id="paymentMethod">
+                                            <option value="cash">Cash</option>
+                                            <option value="card">Card</option>
+                                            <option value="bank_transfer">Bank Transfer</option>
+                                            <option value="mobile_money">Mobile Money</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" class="btn btn-primary" onclick="recordPayment()">
+                                        <i class="fas fa-credit-card"></i>
+                                        Record Payment
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <div>
+                                <h5 class="mb-3">Student Balance</h5>
+                                <div id="studentBalance" class="text-muted">Select a student to view balance</div>
+                                
+                                <h5 class="mb-3 mt-3">Payment History</h5>
+                                <div id="paymentHistory" class="text-muted">Select a student to view history</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Billing Section -->
+            <div id="billing-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Billing & Invoices</h1>
+                    <p class="page-subtitle">Manage student billing and invoices</p>
+                </div>
+                <div class="card">
+                    <div class="card-content">
+                        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+                            <div>
+                                <h5 class="mb-3">New Enrollment</h5>
+                                <button class="btn btn-primary mb-3" onclick="openEnrollmentModal()">
+                                    <i class="fas fa-plus"></i>
+                                    Enroll Students
+                                </button>
+                                
+                                <h5 class="mb-3">Quick Actions</h5>
+                                <div class="form-group">
+                                    <select class="form-control" id="bulkActionClass">
+                                        <option value="">Select Class</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-secondary" onclick="generateClassInvoices()">
+                                    Generate Class Invoices
+                                </button>
+                            </div>
+                            
+                            <div>
+                                <h5 class="mb-3">Student Invoices</h5>
+                                <div class="form-group">
+                                    <input type="text" class="form-control" id="invoiceStudentSearch" placeholder="Search student...">
+                                    <button class="btn btn-primary mt-3" onclick="loadInvoices()">Load Invoices</button>
+                                </div>
+                                <div class="table-container">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date <i class="fas fa-sort sort-icon" data-sort="date"></i></th>
+                                                <th>Category <i class="fas fa-sort sort-icon" data-sort="category"></i></th>
+                                                <th>Amount <i class="fas fa-sort sort-icon" data-sort="amount"></i></th>
+                                                <th>Status <i class="fas fa-sort sort-icon" data-sort="status"></i></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="invoicesTableBody">
+                                            <!-- Invoices will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expenses Section -->
+            <div id="expenses-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Expenses</h1>
+                    <p class="page-subtitle">Track and manage school expenses</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-content">
+                        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+                            <div>
+                                <h5 class="mb-3">Add Expense</h5>
+                                <form id="expenseForm">
+                                    <div class="form-group">
+                                        <label>Category</label>
+                                        <input type="text" class="form-control" id="expenseCategory" placeholder="e.g., Utilities, Salaries">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Description</label>
+                                        <input type="text" class="form-control" id="expenseDescription">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Amount</label>
+                                        <input type="number" step="0.01" class="form-control" id="expenseAmount">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Date</label>
+                                        <input type="date" class="form-control" id="expenseDate">
+                                    </div>
+                                    <button type="button" class="btn btn-primary" onclick="saveExpense()">
+                                        Save Expense
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            <div>
+                                <h5 class="mb-3">Expense Summary</h5>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                    <div class="form-group">
+                                        <label>From</label>
+                                        <input type="date" class="form-control" id="expenseStart">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>To</label>
+                                        <input type="date" class="form-control" id="expenseEnd">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Category</label>
+                                        <input type="text" class="form-control" id="expenseFilterCategory" placeholder="All">
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary mb-3" onclick="filterExpenses()">Filter</button>
+                                
+                                <div class="table-container">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date <i class="fas fa-sort sort-icon" data-sort="date"></i></th>
+                                                <th>Category <i class="fas fa-sort sort-icon" data-sort="category"></i></th>
+                                                <th>Description <i class="fas fa-sort sort-icon" data-sort="description"></i></th>
+                                                <th>Amount <i class="fas fa-sort sort-icon" data-sort="amount"></i></th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="expensesTableBody">
+                                            <!-- Expenses will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Categories Section -->
+            <div id="payment-categories-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Payment Types</h1>
+                    <p class="page-subtitle">Configure payment categories</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Payment Categories</h3>
+                        <button class="btn btn-primary" onclick="addPaymentCategory()">
+                            <i class="fas fa-plus"></i>
+                            Add Category
+                        </button>
+                    </div>
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Category Name <i class="fas fa-sort sort-icon" data-sort="name"></i></th>
+                                        <th>Type <i class="fas fa-sort sort-icon" data-sort="type"></i></th>
+                                        <th>Default Amount <i class="fas fa-sort sort-icon" data-sort="amount"></i></th>
+                                        <th>Status <i class="fas fa-sort sort-icon" data-sort="status"></i></th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categoriesTableBody">
+                                    <!-- Payment categories will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Section -->
+            <div id="reports-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Reports</h1>
+                    <p class="page-subtitle">Financial reports and analytics</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Payment Reports</h3>
+                    </div>
+                    <div class="card-content">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+                            <div class="form-group">
+                                <label>Date Range</label>
+                                <input type="text" class="form-control" id="reportDateRange" placeholder="Select date range">
+                            </div>
+                            <div class="form-group">
+                                <label>Payment Type</label>
+                                <select class="form-control" id="reportPaymentType">
+                                    <option value="all">All Types</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <select class="form-control" id="reportClassFilter">
+                                    <option value="all">All Classes</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>&nbsp;</label>
+                                <button class="btn btn-primary" onclick="generateReport()">
+                                    Generate Report
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="reportResults">
+                            <p class="text-muted text-center">Generate a report to view results</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Section -->
+            <div id="settings-section" class="content-section">
+                <div class="page-header">
+                    <h1 class="page-title">Settings</h1>
+                    <p class="page-subtitle">Configure school settings</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">School Information</h3>
+                    </div>
+                    <div class="card-content">
+                        <form id="schoolSettingsForm">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                                <div class="form-group">
+                                    <label>School Name</label>
+                                    <input type="text" class="form-control" id="schoolName" value="Abuzarban School">
+                                </div>
+                                <div class="form-group">
+                                    <label>School Address</label>
+                                    <input type="text" class="form-control" id="schoolAddress">
+                                </div>
+                                <div class="form-group">
+                                    <label>Phone Number</label>
+                                    <input type="tel" class="form-control" id="schoolPhone">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" class="form-control" id="schoolEmail">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary mt-3" onclick="saveSettings()">
+                                Save Settings
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Modal -->
+    <div class="modal" id="studentModal">
+        <div class="modal-content">
+            <h3 class="mb-3">Add New Student</h3>
+            <form id="addStudentForm">
+                <div class="form-group">
+                    <label>Student Name</label>
+                    <input type="text" class="form-control" id="studentName" required>
+                </div>
+                <div class="form-group">
+                    <label>Guardian Name</label>
+                    <input type="text" class="form-control" id="guardianName">
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" class="form-control" id="studentPhone">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-control" id="studentEmail">
+                </div>
+                <div class="form-group">
+                    <label>Class</label>
+                    <select class="form-control" id="studentClass" required>
+                        <option value="">Select Class</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Student</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Class Modal -->
+    <div class="modal" id="classModal">
+  <div class="modal-content">
+    <h3 class="mb-3">Add New Class</h3>
+    <form id="addClassForm">
+      <div class="form-group">
+        <label>Class Name</label>
+        <input type="text" class="form-control" id="className" required placeholder="e.g., Grade 10A">
+      </div>
+      <div class="form-group">
+        <label>Level</label>
+        <select class="form-control" id="classLevel" required>
+          <option value="">Select Level</option>
+          <option value="Primary">Primary</option>
+          <option value="Junior Secondary">Junior Secondary</option>
+          <option value="Senior Secondary">Senior Secondary</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Class Teacher</label>
+        <input type="text" class="form-control" id="classTeacher" placeholder="Teacher name">
+      </div>
+      <div class="form-group">
+        <label>Maximum Capacity</label>
+        <input type="number" class="form-control" id="classCapacity" placeholder="30">
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+        <button type="button" class="btn btn-ghost" id="cancelClassBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Class</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+    <!-- Session Modal -->
+    <div class="modal" id="sessionModal">
+        <div class="modal-content">
+            <h3 class="mb-3">Add New Session</h3>
+            <form id="addSessionForm">
+                <div class="form-group">
+                    <label>Session Name</label>
+                    <input type="text" class="form-control" id="sessionName" required placeholder="e.g., 2024/2025">
+                </div>
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" class="form-control" id="sessionStartDate" required>
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" class="form-control" id="sessionEndDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select class="form-control" id="sessionStatus">
+                        <option value="upcoming">Upcoming</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSession()">Save Session</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal" id="categoryModal">
+        <div class="modal-content">
+            <h3 class="mb-3">Add Payment Category</h3>
+            <form id="addCategoryForm">
+                <div class="form-group">
+                    <label>Category Name</label>
+                    <input type="text" class="form-control" id="categoryName" required>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select class="form-control" id="categoryType">
+                        <option value="compulsory">Compulsory</option>
+                        <option value="optional">Optional</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Default Amount</label>
+                    <input type="number" step="0.01" class="form-control" id="categoryAmount">
+                </div>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCategory()">Save Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Enrollment Modal -->
+    <div class="modal" id="enrollmentModal">
+        <div class="modal-content large">
+            <h3 class="mb-3">Student Enrollment</h3>
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+                <div>
+                    <h5>Enrollment Details</h5>
+                    <form id="enrollmentForm">
+                        <div class="form-group">
+                            <label>Session</label>
+                            <select class="form-control" id="enrollSession" required>
+                                <option value="">Select Session</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Term</label>
+                            <select class="form-control" id="enrollTerm" required>
+                                <option value="First">First Term</option>
+                                <option value="Second">Second Term</option>
+                                <option value="Third">Third Term</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Class</label>
+                            <select class="form-control" id="enrollClass" required onchange="loadClassStudents()">
+                                <option value="">Select Class</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div>
+                    <h5>Select Students</h5>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="enrollStudentSearch" placeholder="Search students...">
+                    </div>
+                    <div id="enrollStudentsList" class="student-selection-list">
+                        <p class="text-muted">Select a class to view students</p>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="enrollSelectedStudents()">
+                    <i class="fas fa-user-plus"></i>
+                    Enroll Selected Students
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Additional CSS for new elements -->
+    <style>
+        .modal-content.large {
+            max-width: 800px;
+            width: 90%;
+        }
+
+        .student-selection-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .student-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .student-checkbox-item:hover {
+            background-color: var(--background);
+        }
+
+        .student-checkbox-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        .search-results {
+            position: absolute;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            width: 100%;
+            margin-top: 2px;
+        }
+
+        .search-result-item {
+            padding: 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background-color 0.2s;
+        }
+
+        .search-result-item:hover {
+            background-color: var(--background);
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .sort-icon {
+            cursor: pointer;
+            opacity: 0.5;
+            margin-left: 0.5rem;
+            transition: opacity 0.2s;
+        }
+
+        .sort-icon:hover {
+            opacity: 1;
+        }
+
+        .sort-icon.active {
+            opacity: 1;
+            color: var(--primary-color);
+        }
+
+        .students-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .student-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            transition: box-shadow 0.2s;
+        }
+
+        .student-card:hover {
+            box-shadow: var(--shadow);
+        }
+
+        .student-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .student-details h4 {
+            margin-bottom: 0.25rem;
+            font-size: 1.1rem;
+        }
+
+        .student-details p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .student-balance {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .text-success { color: var(--success-color); }
+        .text-warning { color: var(--warning-color); }
+        .text-danger { color: var(--danger-color); }
+        .text-muted { color: var(--text-secondary); }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge.success { background: rgba(16, 185, 129, 0.1); color: var(--success-color); }
+        .badge.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
+        .badge.danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); }
+        .badge.info { background: rgba(59, 130, 246, 0.1); color: var(--primary-color); }
+    </style>
+    <script> window.$ = window.jQuery = require('jquery'); </script>
+    
+  <script> 
+
+// Window controls (close/minimize)
+const { ipcRenderer } = require('electron');
+document.getElementById('closeBtn').addEventListener('click', () => {
+    ipcRenderer.send('app-quit');
+});
+document.getElementById('minimizeBtn').addEventListener('click', () => {
+    ipcRenderer.send('app-minimize');
+});
+
+require('./renderer.js');
+
+    </script>
+</body>
+</html>
