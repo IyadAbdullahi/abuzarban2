@@ -350,7 +350,12 @@ async function editStudent(studentId) {
 }
 
 async function deleteStudent(studentId) {
-    if (!confirm('Are you sure you want to delete this student?')) return;
+    const confirmed = await window.customPopup.confirm(
+        'Are you sure you want to delete this student? This action cannot be undone.',
+        'Delete Student'
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/students/student/${studentId}`, {
@@ -430,7 +435,12 @@ async function editClass(classId) {
 }
 
 async function deleteClass(classId) {
-    if (!confirm('Are you sure you want to delete this class?')) return;
+    const confirmed = await window.customPopup.confirm(
+        'Are you sure you want to delete this class? This action cannot be undone.',
+        'Delete Class'
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/classes/${classId}`, {
@@ -556,10 +566,15 @@ async function saveSession() {
 }
 
 async function deleteSession(sessionId) {
-    if (!confirm('Are you sure you want to delete this session?')) return;
+    const confirmed = await window.customPopup.confirm(
+        'Are you sure you want to delete this session? This action cannot be undone.',
+        'Delete Session'
+    );
+    
+    if (!confirmed) return;
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/sessions/session/${sessionId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
             method: 'DELETE'
         });
         
@@ -574,6 +589,7 @@ async function deleteSession(sessionId) {
         showNotification('Error deleting session', 'error');
     }
 }
+
 
 // Payment Recording module
 async function loadPaymentForm() {
@@ -1091,7 +1107,12 @@ async function editExpense(expenseId) {
 }
 
 async function deleteExpense(expenseId) {
-    if (!confirm('Are you sure you want to delete this expense?')) return;
+    const confirmed = await window.customPopup.confirm(
+        'Are you sure you want to delete this expense? This action cannot be undone.',
+        'Delete Expense'
+    );
+    
+    if (!confirmed) return;
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/expenses/expense/${expenseId}`, {
@@ -1243,7 +1264,10 @@ async function saveCategory() {
 }
 
 async function deletePaymentCategory(categoryId) {
-    if (!confirm('Are you sure you want to delete this payment category?')) return;
+     const confirmed = await window.customPopup.confirm(
+        'Are you sure you want to delete this payment category?'
+    );
+    if(!confirmed) return;
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/payment-categories/category/${categoryId}`, {
