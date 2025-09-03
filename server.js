@@ -40,9 +40,11 @@ app.get("/", function(req, res) {
 
 app.use("/api/students", require("./api/school/students"));
 app.use("/api/classes", require("./api/school/classes"));
+app.use("/api/sessions", require("./api/school/sessions"));
 app.use("/api/enrollment", require("./api/school/enrollments"));
 app.use("/api/expenses", require("./api/school/expenses"));
 app.use("/api/payment-categories", require("./api/school/payment-categories"));
+app.use("/api/student-payments", require("./api/school/student-payments"));
 app.use("/api/sync", require("./api/school/sync"));
 
 

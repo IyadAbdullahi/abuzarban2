@@ -603,6 +603,175 @@
         .mt-3 {
             margin-top: 1rem;
         }
+
+        /* Notification System */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow-lg);
+            padding: 1rem 1.5rem;
+            z-index: 10000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            border-left: 4px solid var(--primary-color);
+            min-width: 300px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left-color: var(--success-color);
+        }
+
+        .notification.error {
+            border-left-color: var(--danger-color);
+        }
+
+        .notification.warning {
+            border-left-color: var(--warning-color);
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .notification-content i {
+            font-size: 1.25rem;
+        }
+
+        .notification.success .notification-content i {
+            color: var(--success-color);
+        }
+
+        .notification.error .notification-content i {
+            color: var(--danger-color);
+        }
+
+        .notification.warning .notification-content i {
+            color: var(--warning-color);
+        }
+
+        /* Balance Summary Styles */
+        .balance-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .balance-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 4px;
+        }
+
+        .balance-item .label {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .balance-item .value {
+            font-weight: 700;
+        }
+
+        /* Payment History Styles */
+        .payment-history {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .payment-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            transition: background-color 0.2s;
+        }
+
+        .payment-item:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+
+        .payment-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Report Summary Styles */
+        .report-summary .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .report-summary .stat-card {
+            text-align: center;
+            padding: 1.5rem;
+        }
+
+        .report-summary .stat-title {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .report-summary .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Student Actions */
+        .student-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .student-actions .btn {
+            flex: 1;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        /* Search Results Positioning */
+        .search-results {
+            position: relative;
+            z-index: 100;
+        }
+
+        /* Ensure proper spacing for form elements */
+        .form-group {
+            position: relative;
+        }
+
+        /* Mobile responsiveness improvements */
+        @media (max-width: 768px) {
+            .notification {
+                right: 10px;
+                left: 10px;
+                min-width: auto;
+                transform: translateY(-100px);
+            }
+
+            .notification.show {
+                transform: translateY(0);
+            }
+
+            .balance-summary {
+                font-size: 0.875rem;
+            }
+
+            .student-actions {
+                flex-direction: column;
+            }
+        }
     /* ADD THIS TO YOUR CSS FILE TO PERMANENTLY FIX THE ISSUE */
 
 /* Force form inputs to always accept pointer events */

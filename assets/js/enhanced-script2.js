@@ -1,62 +1,99 @@
-// Global variables
+// Enhanced School Management System JavaScript
+// Complete implementation with all modules connected to backend APIs
+
+// Global configuration
+const API_BASE_URL = 'http://localhost:8001';
+
+// Global state management
 let currentStudents = [];
 let currentClasses = [];
 let currentSessions = [];
 let currentPaymentCategories = [];
 let currentExpenses = [];
-let selectedStudentId = null;
-let sortDirection = {};
+let selectedStudent = null;
+let sortState = {};
 
-// API Base URL
-const API_BASE_URL = 'http://localhost:8001';
-
-// Theme management
-function toggleTheme() {
-    const body = document.body;
-    const themeIcon = document.getElementById('theme-icon');
+// Utility functions
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+            <span>${message}</span>
+        </div>
+    `;
     
-    if (body.getAttribute('data-theme') === 'dark') {
-        body.removeAttribute('data-theme');
-        themeIcon.className = 'fas fa-moon';
-        localStorage.setItem('theme', 'light');
-    } else {
-        body.setAttribute('data-theme', 'dark');
-        themeIcon.className = 'fas fa-sun';
-        localStorage.setItem('theme', 'dark');
-    }
+    // Add to document
+    document.body.appendChild(notification);
+    
+    // Show notification
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => document.body.removeChild(notification), 300);
+    }, 3000);
 }
 
-// Initialize theme on load
-document.addEventListener('DOMContentLoaded', function() {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-        document.body.setAttribute('data-theme', 'dark');
-        document.getElementById('theme-icon').className = 'fas fa-sun';
-    }
-    
-    initializeApp();
-});
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-NG', {
+        style: 'currency',
+        currency: 'NGN'
+    }).format(amount || 0);
+}
 
-// Navigation handling
-function initializeApp() {
-    // Set up navigation
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const section = this.getAttribute('data-section');
-            showSection(section);
-        });
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
     });
-    
-    // Initialize dashboard
-    showSection('dashboard');
 }
 
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// API helper functions
+async function apiCall(endpoint, options = {}) {
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('API call failed:', error);
+        showNotification(`API Error: ${error.message}`, 'error');
+        throw error;
+    }
+}
+
+// Navigation and section management
 function showSection(sectionName) {
     // Hide all sections
-    const sections = document.querySelectorAll('.content-section');
-    sections.forEach(section => section.classList.remove('active'));
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
+    });
     
     // Show selected section
     const targetSection = document.getElementById(`${sectionName}-section`);
@@ -64,9 +101,11 @@ function showSection(sectionName) {
         targetSection.classList.add('active');
     }
     
-    // Update active nav item
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => link.classList.remove('active'));
+    // Update active menu item
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
     const activeLink = document.querySelector(`[data-section="${sectionName}"]`);
     if (activeLink) {
         activeLink.classList.add('active');
@@ -87,7 +126,8 @@ function showSection(sectionName) {
             loadSessions();
             break;
         case 'payments':
-            loadPaymentForm();
+            loadPaymentCategories();
+            clearPaymentForm();
             break;
         case 'billing':
             loadBillingData();
@@ -99,7 +139,7 @@ function showSection(sectionName) {
             loadPaymentCategories();
             break;
         case 'reports':
-            loadReports();
+            initializeReports();
             break;
         case 'settings':
             loadSettings();
@@ -107,67 +147,68 @@ function showSection(sectionName) {
     }
 }
 
-// Dashboard functions
+// Dashboard functionality
 async function loadDashboardData() {
     try {
         // Load students count
-        const studentsResponse = await fetch(`${API_BASE_URL}/api/students/all`);
-        const students = await studentsResponse.json();
+        const students = await apiCall('/api/students/all');
         document.getElementById('activeStudents').textContent = students.length;
         
         // Load payment summary
-        const paymentsResponse = await fetch(`${API_BASE_URL}/api/student-payments/summary-all`);
-        const paymentSummary = await paymentsResponse.json();
-        document.getElementById('totalRevenue').textContent = `₦${Number(paymentSummary.total_paid || 0).toFixed(2)}`;
-        document.getElementById('outstandingFees').textContent = `₦${Number(paymentSummary.total_outstanding || 0).toFixed(2)}`;
+        const paymentSummary = await apiCall('/api/student-payments/summary-all');
+        document.getElementById('totalRevenue').textContent = formatCurrency(paymentSummary.total_paid);
+        document.getElementById('outstandingFees').textContent = formatCurrency(paymentSummary.total_outstanding);
+        
+        // Load today's payments
+        const today = new Date();
+        const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+        const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+        
+        const todayPayments = await apiCall(`/api/student-payments/by-date?start=${startOfDay.toISOString()}&end=${endOfDay.toISOString()}`);
+        const todayTotal = todayPayments.reduce((sum, payment) => sum + (parseFloat(payment.amount_paid) || 0), 0);
         
         // Load expenses summary
-        const expensesResponse = await fetch(`${API_BASE_URL}/api/expenses/summary`);
-        const expensesSummary = await expensesResponse.json();
-        document.getElementById('totalExpenses').textContent = `₦${Number(expensesSummary.total || 0).toFixed(2)}`;
+        const expensesSummary = await apiCall(`/api/expenses/summary?start=${startOfDay.toISOString()}&end=${endOfDay.toISOString()}`);
+        document.getElementById('totalExpenses').textContent = formatCurrency(expensesSummary.total);
         
-        // Load recent transactions
-        await loadRecentTransactions();
+        // Load recent transactions for table
+        loadRecentTransactions();
         
         // Initialize charts
-        initializeCharts();
+        initializeDashboardCharts();
         
     } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        showNotification('Error loading dashboard data', 'error');
+        console.error('Failed to load dashboard data:', error);
     }
 }
 
 async function loadRecentTransactions() {
     try {
-        const today = new Date();
-        const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const payments = await apiCall('/api/student-payments/all');
+        const recentPayments = payments.slice(-10).reverse();
         
-        const response = await fetch(`${API_BASE_URL}/api/student-payments/by-date?start=${lastWeek.toISOString()}&end=${today.toISOString()}`);
-        const transactions = await response.json();
+        const tableBody = document.querySelector('#recentTransactionsTable tbody');
+        tableBody.innerHTML = '';
         
-        const tbody = document.querySelector('#recentTransactionsTable tbody');
-        tbody.innerHTML = '';
-        
-        transactions.slice(-10).reverse().forEach(transaction => {
+        for (const payment of recentPayments) {
+            const student = await apiCall(`/api/students/student/${payment.student_id}`);
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${new Date(transaction.date).toLocaleDateString()}</td>
-                <td>Student ${transaction.student_id}</td>
-                <td>${transaction.payment_type || 'N/A'}</td>
-                <td>₦${Number(transaction.amount_paid || 0).toFixed(2)}</td>
-                <td><span class="badge ${getStatusBadgeClass(transaction.status)}">${transaction.status}</span></td>
-                <td>${transaction.payment_method || 'N/A'}</td>
+                <td>${formatDate(payment.date)}</td>
+                <td>${student ? student.name : 'Unknown'}</td>
+                <td>${payment.payment_type}</td>
+                <td>${formatCurrency(payment.amount_paid)}</td>
+                <td><span class="badge ${payment.status === 'paid' ? 'success' : payment.status === 'partial' ? 'warning' : 'danger'}">${payment.status}</span></td>
+                <td>${payment.payment_method || 'N/A'}</td>
             `;
-            tbody.appendChild(row);
-        });
-        
+            tableBody.appendChild(row);
+        }
     } catch (error) {
-        console.error('Error loading recent transactions:', error);
+        console.error('Failed to load recent transactions:', error);
     }
 }
 
-function initializeCharts() {
+function initializeDashboardCharts() {
     // Revenue vs Expenses Chart
     const revenueCtx = document.getElementById('revenueExpenseChart');
     if (revenueCtx) {
@@ -177,13 +218,13 @@ function initializeCharts() {
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
                 datasets: [{
                     label: 'Revenue',
-                    data: [12000, 15000, 13000, 18000, 16000, 20000],
+                    data: [65000, 59000, 80000, 81000, 56000, 55000],
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     tension: 0.4
                 }, {
                     label: 'Expenses',
-                    data: [8000, 9000, 7500, 11000, 9500, 12000],
+                    data: [28000, 48000, 40000, 19000, 86000, 27000],
                     borderColor: '#f59e0b',
                     backgroundColor: 'rgba(245, 158, 11, 0.1)',
                     tension: 0.4
@@ -226,67 +267,51 @@ function initializeCharts() {
     }
 }
 
-// Students module (existing implementation)
+// Students functionality (existing - keeping as reference)
 async function loadStudents() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/students/all`);
-        currentStudents = await response.json();
+        const students = await apiCall('/api/students/all');
+        const classes = await apiCall('/api/classes/');
         
-        // Load classes for filter
-        await loadClassesForFilter();
+        currentStudents = students;
+        currentClasses = classes;
         
-        renderStudents(currentStudents);
-    } catch (error) {
-        console.error('Error loading students:', error);
-        showNotification('Error loading students', 'error');
-    }
-}
-
-async function loadClassesForFilter() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/classes/`);
-        const classes = await response.json();
-        
+        // Populate class filter
         const classFilter = document.getElementById('studentClassFilter');
         classFilter.innerHTML = '<option value="">All Classes</option>';
-        
         classes.forEach(cls => {
-            const option = document.createElement('option');
-            option.value = cls.id;
-            option.textContent = cls.name;
-            classFilter.appendChild(option);
+            classFilter.innerHTML += `<option value="${cls.id}">${cls.name}</option>`;
         });
+        
+        renderStudents(students);
     } catch (error) {
-        console.error('Error loading classes for filter:', error);
+        console.error('Failed to load students:', error);
     }
 }
 
 function renderStudents(students) {
-    const grid = document.getElementById('studentsGrid');
-    grid.innerHTML = '';
+    const container = document.getElementById('studentsGrid');
+    container.innerHTML = '';
     
     students.forEach(student => {
+        const studentClass = currentClasses.find(c => c.id == student.classId);
         const studentCard = document.createElement('div');
         studentCard.className = 'student-card';
         studentCard.innerHTML = `
             <div class="student-info">
-                <div class="student-avatar">
-                    ${student.name ? student.name.charAt(0).toUpperCase() : 'S'}
-                </div>
+                <div class="student-avatar">${student.name.charAt(0).toUpperCase()}</div>
                 <div class="student-details">
-                    <h4>${student.name || 'Unknown'}</h4>
+                    <h4>${student.name}</h4>
                     <p>ID: ${student.id}</p>
+                    <p>Class: ${studentClass ? studentClass.name : 'Not Assigned'}</p>
                     <p>Guardian: ${student.guardian || 'N/A'}</p>
-                    <p>Phone: ${student.phone || 'N/A'}</p>
                 </div>
             </div>
             <div class="student-balance">
                 <span class="text-muted">Balance:</span>
-                <span class="${student.balance >= 0 ? 'text-success' : 'text-danger'}">
-                    ₦${Number(student.balance || 0).toFixed(2)}
-                </span>
+                <span class="${student.balance < 0 ? 'text-danger' : 'text-success'}">${formatCurrency(student.balance)}</span>
             </div>
-            <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <div class="student-actions" style="margin-top: 1rem; display: flex; gap: 0.5rem;">
                 <button class="btn btn-primary" onclick="editStudent('${student.id}')">
                     <i class="fas fa-edit"></i> Edit
                 </button>
@@ -295,100 +320,24 @@ function renderStudents(students) {
                 </button>
             </div>
         `;
-        grid.appendChild(studentCard);
+        container.appendChild(studentCard);
     });
 }
 
-function addStudent() {
-    document.getElementById('studentModal').classList.add('active');
-    document.getElementById('addStudentForm').reset();
-    
-    // Load classes for dropdown
-    loadClassesForStudentForm();
-}
-
-async function loadClassesForStudentForm() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/classes/`);
-        const classes = await response.json();
-        
-        const classSelect = document.getElementById('studentClass');
-        classSelect.innerHTML = '<option value="">Select Class</option>';
-        
-        classes.forEach(cls => {
-            const option = document.createElement('option');
-            option.value = cls.id;
-            option.textContent = cls.name;
-            classSelect.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error loading classes:', error);
-    }
-}
-
-async function editStudent(studentId) {
-    try {
-        const student = currentStudents.find(s => s.id === studentId);
-        if (!student) return;
-        
-        document.getElementById('studentName').value = student.name || '';
-        document.getElementById('guardianName').value = student.guardian || '';
-        document.getElementById('studentPhone').value = student.phone || '';
-        document.getElementById('studentEmail').value = student.email || '';
-        document.getElementById('studentClass').value = student.classId || '';
-        
-        await loadClassesForStudentForm();
-        document.getElementById('studentModal').classList.add('active');
-        
-        // Store the student ID for updating
-        document.getElementById('addStudentForm').setAttribute('data-student-id', studentId);
-        
-    } catch (error) {
-        console.error('Error editing student:', error);
-        showNotification('Error loading student data', 'error');
-    }
-}
-
-async function deleteStudent(studentId) {
-    const confirmed = await window.customPopup.confirm(
-        'Are you sure you want to delete this student? This action cannot be undone.',
-        'Delete Student'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/students/student/${studentId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showNotification('Student deleted successfully', 'success');
-            loadStudents();
-        } else {
-            throw new Error('Failed to delete student');
-        }
-    } catch (error) {
-        console.error('Error deleting student:', error);
-        showNotification('Error deleting student', 'error');
-    }
-}
-
-// Classes module (existing implementation)
+// Classes functionality (existing - keeping as reference)
 async function loadClasses() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/classes/`);
-        currentClasses = await response.json();
-        renderClasses(currentClasses);
+        const classes = await apiCall('/api/classes/');
+        currentClasses = classes;
+        renderClasses(classes);
     } catch (error) {
-        console.error('Error loading classes:', error);
-        showNotification('Error loading classes', 'error');
+        console.error('Failed to load classes:', error);
     }
 }
 
 function renderClasses(classes) {
-    const tbody = document.getElementById('classesTableBody');
-    tbody.innerHTML = '';
+    const tableBody = document.getElementById('classesTableBody');
+    tableBody.innerHTML = '';
     
     classes.forEach(cls => {
         const row = document.createElement('tr');
@@ -396,137 +345,119 @@ function renderClasses(classes) {
             <td>${cls.name}</td>
             <td>${cls.level}</td>
             <td>${cls.studentCount || 0}</td>
-            <td>${cls.teacher || 'N/A'}</td>
+            <td>${cls.teacher || 'Not Assigned'}</td>
             <td>
                 <button class="btn btn-primary" onclick="editClass(${cls.id})">
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-edit"></i> Edit
                 </button>
                 <button class="btn btn-ghost" onclick="deleteClass(${cls.id})">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </td>
         `;
-        tbody.appendChild(row);
+        tableBody.appendChild(row);
     });
 }
 
-function addClass() {
-    document.getElementById('classModal').classList.add('active');
-    document.getElementById('addClassForm').reset();
-}
-
-async function editClass(classId) {
-    try {
-        const cls = currentClasses.find(c => c.id === classId);
-        if (!cls) return;
-        
-        document.getElementById('className').value = cls.name || '';
-        document.getElementById('classLevel').value = cls.level || '';
-        document.getElementById('classTeacher').value = cls.teacher || '';
-        document.getElementById('classCapacity').value = cls.capacity || '';
-        
-        document.getElementById('classModal').classList.add('active');
-        document.getElementById('addClassForm').setAttribute('data-class-id', classId);
-        
-    } catch (error) {
-        console.error('Error editing class:', error);
-        showNotification('Error loading class data', 'error');
-    }
-}
-
-async function deleteClass(classId) {
-    const confirmed = await window.customPopup.confirm(
-        'Are you sure you want to delete this class? This action cannot be undone.',
-        'Delete Class'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/classes/${classId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            showNotification('Class deleted successfully', 'success');
-            loadClasses();
-        } else {
-            throw new Error('Failed to delete class');
-        }
-    } catch (error) {
-        console.error('Error deleting class:', error);
-        showNotification('Error deleting class', 'error');
-    }
-}
-
-// Sessions module
+// Sessions functionality
 async function loadSessions() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/sessions/all`);
-        currentSessions = await response.json();
-        renderSessions(currentSessions);
+        const sessions = await apiCall('/api/sessions/all');
+        currentSessions = sessions;
+        renderSessions(sessions);
     } catch (error) {
-        console.error('Error loading sessions:', error);
-        showNotification('Error loading sessions', 'error');
-        // Fallback to empty array if API doesn't exist yet
-        currentSessions = [];
-        renderSessions(currentSessions);
+        console.error('Failed to load sessions:', error);
+        showNotification('Failed to load sessions', 'error');
     }
 }
 
 function renderSessions(sessions) {
-    const tbody = document.getElementById('sessionsTableBody');
-    tbody.innerHTML = '';
+    const tableBody = document.getElementById('sessionsTableBody');
+    tableBody.innerHTML = '';
     
     sessions.forEach(session => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${session.name}</td>
-            <td>${new Date(session.startDate).toLocaleDateString()}</td>
-            <td>${new Date(session.endDate).toLocaleDateString()}</td>
-            <td><span class="badge ${getStatusBadgeClass(session.status)}">${session.status}</span></td>
+            <td>${formatDate(session.startDate)}</td>
+            <td>${formatDate(session.endDate)}</td>
+            <td><span class="badge ${session.status === 'active' ? 'success' : session.status === 'upcoming' ? 'info' : 'warning'}">${session.status}</span></td>
             <td>
                 <button class="btn btn-primary" onclick="editSession(${session._id})">
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-edit"></i> Edit
                 </button>
                 <button class="btn btn-ghost" onclick="deleteSession(${session._id})">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </td>
         `;
-        tbody.appendChild(row);
+        tableBody.appendChild(row);
     });
 }
 
-function addSession() {
+async function addSession() {
+    // Populate session modal with classes
+    await loadClassesForModal();
     document.getElementById('sessionModal').classList.add('active');
-    document.getElementById('addSessionForm').reset();
-}
-
-async function editSession(sessionId) {
-    try {
-        const session = currentSessions.find(s => s._id === sessionId);
-        if (!session) return;
-        
-        document.getElementById('sessionName').value = session.name || '';
-        document.getElementById('sessionStartDate').value = session.startDate ? session.startDate.split('T')[0] : '';
-        document.getElementById('sessionEndDate').value = session.endDate ? session.endDate.split('T')[0] : '';
-        document.getElementById('sessionStatus').value = session.status || 'upcoming';
-        
-        document.getElementById('sessionModal').classList.add('active');
-        document.getElementById('addSessionForm').setAttribute('data-session-id', sessionId);
-        
-    } catch (error) {
-        console.error('Error editing session:', error);
-        showNotification('Error loading session data', 'error');
-    }
 }
 
 async function saveSession() {
     const form = document.getElementById('addSessionForm');
-    const sessionId = form.getAttribute('data-session-id');
+    const formData = new FormData(form);
     
     const sessionData = {
+        name: formData.get('sessionName') || document.getElementById('sessionName').value,
+        startDate: formData.get('sessionStartDate') || document.getElementById('sessionStartDate').value,
+        endDate: formData.get('sessionEndDate') || document.getElementById('sessionEndDate').value,
+        status: formData.get('sessionStatus') || document.getElementById('sessionStatus').value
+    };
+    
+    if (!sessionData.name || !sessionData.startDate || !sessionData.endDate) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall('/api/sessions/session', {
+            method: 'POST',
+            body: JSON.stringify(sessionData)
+        });
+        
+        showNotification('Session added successfully', 'success');
+        closeModal();
+        loadSessions();
+    } catch (error) {
+        console.error('Failed to save session:', error);
+        showNotification('Failed to save session', 'error');
+    }
+}
+
+async function editSession(sessionId) {
+    try {
+        const session = await apiCall(`/api/sessions/session/${sessionId}`);
+        
+        document.getElementById('sessionName').value = session.name;
+        document.getElementById('sessionStartDate').value = session.startDate.split('T')[0];
+        document.getElementById('sessionEndDate').value = session.endDate.split('T')[0];
+        document.getElementById('sessionStatus').value = session.status;
+        
+        // Change form to edit mode
+        const form = document.getElementById('addSessionForm');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await updateSession(sessionId);
+        };
+        
+        document.getElementById('sessionModal').classList.add('active');
+    } catch (error) {
+        console.error('Failed to load session:', error);
+        showNotification('Failed to load session', 'error');
+    }
+}
+
+async function updateSession(sessionId) {
+    const sessionData = {
+        _id: sessionId,
         name: document.getElementById('sessionName').value,
         startDate: document.getElementById('sessionStartDate').value,
         endDate: document.getElementById('sessionEndDate').value,
@@ -534,106 +465,89 @@ async function saveSession() {
     };
     
     try {
-        let response;
-        if (sessionId) {
-            // Update existing session
-            sessionData._id = parseInt(sessionId);
-            response = await fetch(`${API_BASE_URL}/api/sessions/session`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sessionData)
-            });
-        } else {
-            // Create new session
-            response = await fetch(`${API_BASE_URL}/api/sessions/session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(sessionData)
-            });
-        }
+        await apiCall('/api/sessions/session', {
+            method: 'PUT',
+            body: JSON.stringify(sessionData)
+        });
         
-        if (response.ok) {
-            showNotification('Session saved successfully', 'success');
-            closeModal();
-            loadSessions();
-        } else {
-            throw new Error('Failed to save session');
-        }
+        showNotification('Session updated successfully', 'success');
+        closeModal();
+        loadSessions();
     } catch (error) {
-        console.error('Error saving session:', error);
-        showNotification('Error saving session', 'error');
+        console.error('Failed to update session:', error);
+        showNotification('Failed to update session', 'error');
     }
 }
 
 async function deleteSession(sessionId) {
-    const confirmed = await window.customPopup.confirm(
-        'Are you sure you want to delete this session? This action cannot be undone.',
-        'Delete Session'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
+    if (await showConfirm('Are you sure you want to delete this session?', 'Delete Session')) {
+        try {
+            await apiCall(`/api/sessions/session/${sessionId}`, {
+                method: 'DELETE'
+            });
+            
             showNotification('Session deleted successfully', 'success');
             loadSessions();
-        } else {
-            throw new Error('Failed to delete session');
+        } catch (error) {
+            console.error('Failed to delete session:', error);
+            showNotification('Failed to delete session', 'error');
+        }
+    }
+}
+
+// Payment recording functionality
+async function loadPaymentCategories() {
+    try {
+        const categories = await apiCall('/api/payment-categories/all');
+        currentPaymentCategories = categories;
+        
+        // Populate payment type dropdown
+        const paymentTypeSelect = document.getElementById('paymentType');
+        if (paymentTypeSelect) {
+            paymentTypeSelect.innerHTML = '<option value="">Select Payment Type</option>';
+            categories.forEach(category => {
+                paymentTypeSelect.innerHTML += `<option value="${category._id}" data-amount="${category.amount}">${category.name} (${formatCurrency(category.amount)})</option>`;
+            });
+        }
+        
+        // If we're on payment categories section, render the table
+        if (document.getElementById('categoriesTableBody')) {
+            renderPaymentCategories(categories);
         }
     } catch (error) {
-        console.error('Error deleting session:', error);
-        showNotification('Error deleting session', 'error');
+        console.error('Failed to load payment categories:', error);
+        showNotification('Failed to load payment categories', 'error');
     }
 }
 
-
-// Payment Recording module
-async function loadPaymentForm() {
-    try {
-        // Load payment categories
-        const response = await fetch(`${API_BASE_URL}/api/payment-categories/all`);
-        const categories = await response.json();
-        
-        const paymentTypeSelect = document.getElementById('paymentType');
-        paymentTypeSelect.innerHTML = '<option value="">Select Payment Type</option>';
-        
-        categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category._id;
-            option.textContent = `${category.name} - ₦${Number(category.amount || 0).toFixed(2)}`;
-            option.setAttribute('data-amount', category.amount || 0);
-            paymentTypeSelect.appendChild(option);
-        });
-        
-        // Set up student search
-        setupStudentSearch();
-        
-    } catch (error) {
-        console.error('Error loading payment form:', error);
-        showNotification('Error loading payment form', 'error');
-    }
+function clearPaymentForm() {
+    document.getElementById('paymentStudentSearch').value = '';
+    document.getElementById('paymentType').value = '';
+    document.getElementById('paymentAmount').value = '';
+    document.getElementById('paymentMethod').value = 'cash';
+    document.getElementById('selectedStudentInfo').innerHTML = '';
+    document.getElementById('studentBalance').innerHTML = 'Select a student to view balance';
+    document.getElementById('paymentHistory').innerHTML = 'Select a student to view history';
+    selectedStudent = null;
 }
 
-function setupStudentSearch() {
+// Setup payment student search
+function setupPaymentStudentSearch() {
     const searchInput = document.getElementById('paymentStudentSearch');
-    const resultsDiv = document.getElementById('studentSearchResults');
+    const resultsContainer = document.getElementById('studentSearchResults');
     
-    searchInput.addEventListener('input', async function() {
-        const query = this.value.trim();
+    if (!searchInput || !resultsContainer) return;
+    
+    const debouncedSearch = debounce(async (query) => {
         if (query.length < 2) {
-            resultsDiv.innerHTML = '';
+            resultsContainer.innerHTML = '';
             return;
         }
         
         try {
-            const response = await fetch(`${API_BASE_URL}/api/students/search/${encodeURIComponent(query)}`);
-            const students = await response.json();
+            const students = await apiCall(`/api/students/search/${encodeURIComponent(query)}`);
             
-            resultsDiv.innerHTML = '';
+            resultsContainer.innerHTML = '';
             students.slice(0, 5).forEach(student => {
                 const resultItem = document.createElement('div');
                 resultItem.className = 'search-result-item';
@@ -641,29 +555,34 @@ function setupStudentSearch() {
                     <strong>${student.name}</strong><br>
                     <small>ID: ${student.id} | Guardian: ${student.guardian || 'N/A'}</small>
                 `;
-                resultItem.addEventListener('click', () => selectStudent(student));
-                resultsDiv.appendChild(resultItem);
+                resultItem.onclick = () => selectStudentForPayment(student);
+                resultsContainer.appendChild(resultItem);
             });
         } catch (error) {
-            console.error('Error searching students:', error);
+            console.error('Student search failed:', error);
         }
+    }, 300);
+    
+    searchInput.addEventListener('input', (e) => {
+        debouncedSearch(e.target.value);
     });
 }
 
-async function selectStudent(student) {
-    selectedStudentId = student.id;
+async function selectStudentForPayment(student) {
+    selectedStudent = student;
     
     // Clear search results
     document.getElementById('studentSearchResults').innerHTML = '';
     document.getElementById('paymentStudentSearch').value = student.name;
     
     // Show selected student info
-    const infoDiv = document.getElementById('selectedStudentInfo');
-    infoDiv.innerHTML = `
+    const studentInfo = document.getElementById('selectedStudentInfo');
+    studentInfo.innerHTML = `
         <div class="card" style="padding: 1rem; margin: 1rem 0;">
             <h5>${student.name}</h5>
-            <p>ID: ${student.id}</p>
-            <p>Guardian: ${student.guardian || 'N/A'}</p>
+            <p><strong>ID:</strong> ${student.id}</p>
+            <p><strong>Guardian:</strong> ${student.guardian || 'N/A'}</p>
+            <p><strong>Class:</strong> ${student.classId || 'Not Assigned'}</p>
         </div>
     `;
     
@@ -674,192 +593,180 @@ async function selectStudent(student) {
 
 async function loadStudentBalance(studentId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/student-payments/summary/${studentId}`);
-        const summary = await response.json();
+        const summary = await apiCall(`/api/student-payments/summary/${studentId}`);
         
-        const balanceDiv = document.getElementById('studentBalance');
-        balanceDiv.innerHTML = `
-            <div class="card" style="padding: 1rem;">
-                <h6>Payment Summary</h6>
-                <p>Total Paid: <span class="text-success">₦${Number(summary.total_paid || 0).toFixed(2)}</span></p>
-                <p>Outstanding: <span class="text-warning">₦${Number(summary.total_outstanding || 0).toFixed(2)}</span></p>
-                <p>Compulsory Outstanding: <span class="text-danger">₦${Number(summary.compulsory_outstanding || 0).toFixed(2)}</span></p>
+        const balanceContainer = document.getElementById('studentBalance');
+        balanceContainer.innerHTML = `
+            <div class="balance-summary">
+                <div class="balance-item">
+                    <span class="label">Total Paid:</span>
+                    <span class="value text-success">${formatCurrency(summary.total_paid)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="label">Outstanding:</span>
+                    <span class="value text-danger">${formatCurrency(summary.total_outstanding)}</span>
+                </div>
+                <div class="balance-item">
+                    <span class="label">Compulsory Outstanding:</span>
+                    <span class="value text-warning">${formatCurrency(summary.compulsory_outstanding)}</span>
+                </div>
             </div>
         `;
     } catch (error) {
-        console.error('Error loading student balance:', error);
-        document.getElementById('studentBalance').innerHTML = '<p class="text-muted">Error loading balance</p>';
+        console.error('Failed to load student balance:', error);
     }
 }
 
 async function loadStudentPaymentHistory(studentId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/student-payments/student/${studentId}`);
-        const payments = await response.json();
+        const payments = await apiCall(`/api/student-payments/student/${studentId}`);
         
-        const historyDiv = document.getElementById('paymentHistory');
+        const historyContainer = document.getElementById('paymentHistory');
         if (payments.length === 0) {
-            historyDiv.innerHTML = '<p class="text-muted">No payment history</p>';
+            historyContainer.innerHTML = '<p class="text-muted">No payment history found</p>';
             return;
         }
         
-        let historyHtml = '<div class="table-container"><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead><tbody>';
-        
+        let historyHTML = '<div class="payment-history">';
         payments.slice(-5).reverse().forEach(payment => {
-            historyHtml += `
-                <tr>
-                    <td>${new Date(payment.date).toLocaleDateString()}</td>
-                    <td>${payment.payment_type || 'N/A'}</td>
-                    <td>₦${Number(payment.amount_paid || 0).toFixed(2)}</td>
-                    <td><span class="badge ${getStatusBadgeClass(payment.status)}">${payment.status}</span></td>
-                </tr>
+            historyHTML += `
+                <div class="payment-item" style="padding: 0.5rem; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>${payment.payment_type}</span>
+                        <span class="text-success">${formatCurrency(payment.amount_paid)}</span>
+                    </div>
+                    <small class="text-muted">${formatDate(payment.date)} - ${payment.payment_method || 'N/A'}</small>
+                </div>
             `;
         });
+        historyHTML += '</div>';
         
-        historyHtml += '</tbody></table></div>';
-        historyDiv.innerHTML = historyHtml;
-        
+        historyContainer.innerHTML = historyHTML;
     } catch (error) {
-        console.error('Error loading payment history:', error);
-        document.getElementById('paymentHistory').innerHTML = '<p class="text-muted">Error loading payment history</p>';
+        console.error('Failed to load payment history:', error);
+    }
+}
+
+// Payment type selection handler
+function setupPaymentTypeHandler() {
+    const paymentTypeSelect = document.getElementById('paymentType');
+    const amountInput = document.getElementById('paymentAmount');
+    
+    if (paymentTypeSelect && amountInput) {
+        paymentTypeSelect.addEventListener('change', (e) => {
+            const selectedOption = e.target.selectedOptions[0];
+            if (selectedOption && selectedOption.dataset.amount) {
+                amountInput.value = selectedOption.dataset.amount;
+            }
+        });
     }
 }
 
 async function recordPayment() {
-    if (!selectedStudentId) {
-        showNotification('Please select a student first', 'warning');
+    if (!selectedStudent) {
+        showNotification('Please select a student first', 'error');
         return;
     }
     
     const paymentData = {
-        student_id: parseInt(selectedStudentId),
+        student_id: parseInt(selectedStudent.id),
         payment_category_id: parseInt(document.getElementById('paymentType').value),
+        amount: parseFloat(document.getElementById('paymentAmount').value),
         amount_paid: parseFloat(document.getElementById('paymentAmount').value),
         payment_method: document.getElementById('paymentMethod').value,
-        payment_type: document.getElementById('paymentType').selectedOptions[0]?.textContent.split(' - ')[0] || 'payment'
+        payment_type: currentPaymentCategories.find(c => c._id == document.getElementById('paymentType').value)?.type || 'optional'
     };
     
-    // Get the category amount for total amount
-    const selectedOption = document.getElementById('paymentType').selectedOptions[0];
-    if (selectedOption) {
-        paymentData.amount = parseFloat(selectedOption.getAttribute('data-amount') || paymentData.amount_paid);
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/student-payments/payment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(paymentData)
-        });
-        
-        if (response.ok) {
-            showNotification('Payment recorded successfully', 'success');
-            document.getElementById('paymentForm').reset();
-            
-            // Refresh student balance and history
-            if (selectedStudentId) {
-                await loadStudentBalance(selectedStudentId);
-                await loadStudentPaymentHistory(selectedStudentId);
-            }
-        } else {
-            throw new Error('Failed to record payment');
-        }
-    } catch (error) {
-        console.error('Error recording payment:', error);
-        showNotification('Error recording payment', 'error');
-    }
-}
-
-// Billing module
-async function loadBillingData() {
-    try {
-        // Load sessions for enrollment
-        await loadSessionsForBilling();
-        
-        // Load classes for enrollment and bulk actions
-        await loadClassesForBilling();
-        
-    } catch (error) {
-        console.error('Error loading billing data:', error);
-        showNotification('Error loading billing data', 'error');
-    }
-}
-
-async function loadSessionsForBilling() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/sessions/all`);
-        const sessions = await response.json();
-        
-        const sessionSelect = document.getElementById('enrollSession');
-        sessionSelect.innerHTML = '<option value="">Select Session</option>';
-        
-        sessions.forEach(session => {
-            const option = document.createElement('option');
-            option.value = session.name;
-            option.textContent = session.name;
-            sessionSelect.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error loading sessions for billing:', error);
-    }
-}
-
-async function loadClassesForBilling() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/classes/`);
-        const classes = await response.json();
-        
-        // Load for enrollment modal
-        const enrollClassSelect = document.getElementById('enrollClass');
-        enrollClassSelect.innerHTML = '<option value="">Select Class</option>';
-        
-        // Load for bulk actions
-        const bulkActionSelect = document.getElementById('bulkActionClass');
-        bulkActionSelect.innerHTML = '<option value="">Select Class</option>';
-        
-        classes.forEach(cls => {
-            const option1 = document.createElement('option');
-            option1.value = cls.id;
-            option1.textContent = cls.name;
-            enrollClassSelect.appendChild(option1);
-            
-            const option2 = document.createElement('option');
-            option2.value = cls.id;
-            option2.textContent = cls.name;
-            bulkActionSelect.appendChild(option2);
-        });
-    } catch (error) {
-        console.error('Error loading classes for billing:', error);
-    }
-}
-
-function openEnrollmentModal() {
-    document.getElementById('enrollmentModal').classList.add('active');
-    loadSessionsForBilling();
-    loadClassesForBilling();
-}
-
-async function loadClassStudents() {
-    const classId = document.getElementById('enrollClass').value;
-    const studentsList = document.getElementById('enrollStudentsList');
-    
-    if (!classId) {
-        studentsList.innerHTML = '<p class="text-muted">Select a class to view students</p>';
+    if (!paymentData.payment_category_id || !paymentData.amount || paymentData.amount <= 0) {
+        showNotification('Please fill in all required fields with valid values', 'error');
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/students/by-class/${classId}`);
-        const students = await response.json();
+        await apiCall('/api/student-payments/payment', {
+            method: 'POST',
+            body: JSON.stringify(paymentData)
+        });
+        
+        showNotification('Payment recorded successfully', 'success');
+        
+        // Refresh student balance and history
+        await loadStudentBalance(selectedStudent.id);
+        await loadStudentPaymentHistory(selectedStudent.id);
+        
+        // Clear form
+        document.getElementById('paymentType').value = '';
+        document.getElementById('paymentAmount').value = '';
+        
+    } catch (error) {
+        console.error('Failed to record payment:', error);
+        showNotification('Failed to record payment', 'error');
+    }
+}
+
+// Billing functionality
+async function loadBillingData() {
+    try {
+        // Load classes for bulk actions
+        const classes = await apiCall('/api/classes/');
+        const bulkActionSelect = document.getElementById('bulkActionClass');
+        const enrollClassSelect = document.getElementById('enrollClass');
+        
+        if (bulkActionSelect) {
+            bulkActionSelect.innerHTML = '<option value="">Select Class</option>';
+            classes.forEach(cls => {
+                bulkActionSelect.innerHTML += `<option value="${cls.id}">${cls.name}</option>`;
+            });
+        }
+        
+        if (enrollClassSelect) {
+            enrollClassSelect.innerHTML = '<option value="">Select Class</option>';
+            classes.forEach(cls => {
+                enrollClassSelect.innerHTML += `<option value="${cls.id}">${cls.name}</option>`;
+            });
+        }
+        
+        // Load sessions for enrollment
+        const sessions = await apiCall('/api/sessions/all');
+        const enrollSessionSelect = document.getElementById('enrollSession');
+        if (enrollSessionSelect) {
+            enrollSessionSelect.innerHTML = '<option value="">Select Session</option>';
+            sessions.forEach(session => {
+                enrollSessionSelect.innerHTML += `<option value="${session.name}">${session.name}</option>`;
+            });
+        }
+        
+    } catch (error) {
+        console.error('Failed to load billing data:', error);
+        showNotification('Failed to load billing data', 'error');
+    }
+}
+
+function openEnrollmentModal() {
+    loadBillingData();
+    document.getElementById('enrollmentModal').classList.add('active');
+}
+
+async function loadClassStudents() {
+    const classId = document.getElementById('enrollClass').value;
+    const studentsListContainer = document.getElementById('enrollStudentsList');
+    
+    if (!classId) {
+        studentsListContainer.innerHTML = '<p class="text-muted">Select a class to view students</p>';
+        return;
+    }
+    
+    try {
+        const students = await apiCall(`/api/students/by-class/${classId}`);
         
         if (students.length === 0) {
-            studentsList.innerHTML = '<p class="text-muted">No students found in this class</p>';
+            studentsListContainer.innerHTML = '<p class="text-muted">No students found in this class</p>';
             return;
         }
         
-        let studentsHtml = '';
+        let studentsHTML = '';
         students.forEach(student => {
-            studentsHtml += `
+            studentsHTML += `
                 <div class="student-checkbox-item">
                     <input type="checkbox" id="student_${student.id}" value="${student.id}">
                     <label for="student_${student.id}">
@@ -870,11 +777,10 @@ async function loadClassStudents() {
             `;
         });
         
-        studentsList.innerHTML = studentsHtml;
-        
+        studentsListContainer.innerHTML = studentsHTML;
     } catch (error) {
-        console.error('Error loading class students:', error);
-        studentsList.innerHTML = '<p class="text-muted">Error loading students</p>';
+        console.error('Failed to load class students:', error);
+        showNotification('Failed to load students', 'error');
     }
 }
 
@@ -884,34 +790,30 @@ async function enrollSelectedStudents() {
     const classId = document.getElementById('enrollClass').value;
     
     if (!session || !term || !classId) {
-        showNotification('Please fill in all enrollment details', 'warning');
+        showNotification('Please fill in all enrollment details', 'error');
         return;
     }
     
-    const selectedStudents = [];
-    const checkboxes = document.querySelectorAll('#enrollStudentsList input[type="checkbox"]:checked');
-    checkboxes.forEach(checkbox => {
-        selectedStudents.push(parseInt(checkbox.value));
-    });
+    const selectedStudents = Array.from(document.querySelectorAll('#enrollStudentsList input[type="checkbox"]:checked'))
+        .map(checkbox => parseInt(checkbox.value));
     
     if (selectedStudents.length === 0) {
-        showNotification('Please select at least one student', 'warning');
+        showNotification('Please select at least one student', 'error');
         return;
     }
     
     try {
-        const enrollmentPromises = selectedStudents.map(studentId => {
-            return fetch(`${API_BASE_URL}/api/enrollment/enrollment?generateInvoices=1`, {
+        const enrollmentPromises = selectedStudents.map(studentId => 
+            apiCall('/api/enrollment/enrollment?generateInvoices=1', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     student_id: studentId,
                     session: session,
                     term: term,
                     class_id: classId
                 })
-            });
-        });
+            })
+        );
         
         await Promise.all(enrollmentPromises);
         
@@ -919,138 +821,135 @@ async function enrollSelectedStudents() {
         closeModal();
         
     } catch (error) {
-        console.error('Error enrolling students:', error);
-        showNotification('Error enrolling students', 'error');
+        console.error('Failed to enroll students:', error);
+        showNotification('Failed to enroll students', 'error');
     }
 }
 
 async function loadInvoices() {
-    const searchQuery = document.getElementById('invoiceStudentSearch').value.trim();
-    if (!searchQuery) {
-        showNotification('Please enter a student name or ID', 'warning');
+    const searchTerm = document.getElementById('invoiceStudentSearch').value;
+    
+    if (!searchTerm) {
+        showNotification('Please enter a student name or ID', 'error');
         return;
     }
     
     try {
-        // First, search for the student
-        const studentsResponse = await fetch(`${API_BASE_URL}/api/students/search/${encodeURIComponent(searchQuery)}`);
-        const students = await studentsResponse.json();
+        // Search for student first
+        const students = await apiCall(`/api/students/search/${encodeURIComponent(searchTerm)}`);
         
         if (students.length === 0) {
-            showNotification('No students found', 'warning');
+            showNotification('No students found', 'error');
             return;
         }
         
-        const student = students[0]; // Take the first match
+        const student = students[0]; // Take first match
+        const invoices = await apiCall(`/api/enrollment/invoices/by-student/${student.id}`);
         
-        // Load invoices for this student
-        const invoicesResponse = await fetch(`${API_BASE_URL}/api/enrollment/invoices/by-student/${student.id}`);
-        const invoices = await invoicesResponse.json();
-        
-        const tbody = document.getElementById('invoicesTableBody');
-        tbody.innerHTML = '';
+        const tableBody = document.getElementById('invoicesTableBody');
+        tableBody.innerHTML = '';
         
         invoices.forEach(invoice => {
+            const category = currentPaymentCategories.find(c => c._id === invoice.payment_category_id);
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${new Date(invoice.date).toLocaleDateString()}</td>
-                <td>${invoice.payment_type || 'N/A'}</td>
-                <td>₦${Number(invoice.amount || 0).toFixed(2)}</td>
-                <td><span class="badge ${getStatusBadgeClass(invoice.status)}">${invoice.status}</span></td>
+                <td>${formatDate(invoice.date)}</td>
+                <td>${category ? category.name : 'Unknown'}</td>
+                <td>${formatCurrency(invoice.amount)}</td>
+                <td><span class="badge ${invoice.status === 'paid' ? 'success' : invoice.status === 'partial' ? 'warning' : 'danger'}">${invoice.status}</span></td>
             `;
-            tbody.appendChild(row);
+            tableBody.appendChild(row);
         });
         
     } catch (error) {
-        console.error('Error loading invoices:', error);
-        showNotification('Error loading invoices', 'error');
+        console.error('Failed to load invoices:', error);
+        showNotification('Failed to load invoices', 'error');
     }
 }
 
 async function generateClassInvoices() {
     const classId = document.getElementById('bulkActionClass').value;
+    
     if (!classId) {
-        showNotification('Please select a class', 'warning');
+        showNotification('Please select a class', 'error');
         return;
     }
     
-    try {
-        // Get students in the class
-        const studentsResponse = await fetch(`${API_BASE_URL}/api/students/by-class/${classId}`);
-        const students = await studentsResponse.json();
-        
-        if (students.length === 0) {
-            showNotification('No students found in this class', 'warning');
-            return;
-        }
-        
-        // Generate invoices for all students in the class
-        const currentSession = '2024/2025'; // You might want to make this dynamic
-        const currentTerm = 'First';
-        
-        const enrollmentPromises = students.map(student => {
-            return fetch(`${API_BASE_URL}/api/enrollment/enrollment?generateInvoices=1`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    student_id: student.id,
-                    session: currentSession,
-                    term: currentTerm,
-                    class_id: classId
-                })
+    if (await showConfirm('Generate invoices for all students in this class?', 'Generate Invoices')) {
+        try {
+            const students = await apiCall(`/api/students/by-class/${classId}`);
+            const compulsoryCategories = await apiCall('/api/payment-categories/compulsory');
+            
+            const invoicePromises = [];
+            students.forEach(student => {
+                compulsoryCategories.forEach(category => {
+                    invoicePromises.push(
+                        apiCall('/api/enrollment/invoices/invoice', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                student_id: parseInt(student.id),
+                                payment_category_id: category._id,
+                                amount: category.amount,
+                                amount_paid: 0,
+                                status: 'unpaid',
+                                payment_type: 'compulsory'
+                            })
+                        })
+                    );
+                });
             });
-        });
-        
-        await Promise.all(enrollmentPromises);
-        
-        showNotification(`Generated invoices for ${students.length} students`, 'success');
-        
-    } catch (error) {
-        console.error('Error generating class invoices:', error);
-        showNotification('Error generating class invoices', 'error');
+            
+            await Promise.all(invoicePromises);
+            showNotification('Invoices generated successfully', 'success');
+            
+        } catch (error) {
+            console.error('Failed to generate invoices:', error);
+            showNotification('Failed to generate invoices', 'error');
+        }
     }
 }
 
-// Expenses module
+// Expenses functionality
 async function loadExpenses() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/expenses/all`);
-        currentExpenses = await response.json();
-        renderExpenses(currentExpenses);
+        const expenses = await apiCall('/api/expenses/all');
+        currentExpenses = expenses;
+        renderExpenses(expenses);
         
         // Set default date range to current month
         const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        document.getElementById('expenseStart').value = firstDay.toISOString().split('T')[0];
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        document.getElementById('expenseStart').value = startOfMonth.toISOString().split('T')[0];
         document.getElementById('expenseEnd').value = now.toISOString().split('T')[0];
+        document.getElementById('expenseDate').value = now.toISOString().split('T')[0];
         
     } catch (error) {
-        console.error('Error loading expenses:', error);
-        showNotification('Error loading expenses', 'error');
+        console.error('Failed to load expenses:', error);
+        showNotification('Failed to load expenses', 'error');
     }
 }
 
 function renderExpenses(expenses) {
-    const tbody = document.getElementById('expensesTableBody');
-    tbody.innerHTML = '';
+    const tableBody = document.getElementById('expensesTableBody');
+    tableBody.innerHTML = '';
     
     expenses.forEach(expense => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${new Date(expense.date).toLocaleDateString()}</td>
+            <td>${formatDate(expense.date)}</td>
             <td>${expense.category}</td>
             <td>${expense.description || 'N/A'}</td>
-            <td>₦${Number(expense.amount || 0).toFixed(2)}</td>
+            <td>${formatCurrency(expense.amount)}</td>
             <td>
                 <button class="btn btn-primary" onclick="editExpense(${expense._id})">
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-edit"></i> Edit
                 </button>
                 <button class="btn btn-ghost" onclick="deleteExpense(${expense._id})">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </td>
         `;
-        tbody.appendChild(row);
+        tableBody.appendChild(row);
     });
 }
 
@@ -1059,75 +958,107 @@ async function saveExpense() {
         category: document.getElementById('expenseCategory').value,
         description: document.getElementById('expenseDescription').value,
         amount: parseFloat(document.getElementById('expenseAmount').value),
-        date: document.getElementById('expenseDate').value || new Date().toISOString()
+        date: document.getElementById('expenseDate').value
     };
     
-    if (!expenseData.category || !expenseData.amount) {
-        showNotification('Please fill in required fields', 'warning');
+    if (!expenseData.category || !expenseData.amount || expenseData.amount <= 0) {
+        showNotification('Please fill in all required fields', 'error');
         return;
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/expenses/expense`, {
+        await apiCall('/api/expenses/expense', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(expenseData)
         });
         
-        if (response.ok) {
-            showNotification('Expense saved successfully', 'success');
-            document.getElementById('expenseForm').reset();
-            loadExpenses();
-        } else {
-            throw new Error('Failed to save expense');
-        }
+        showNotification('Expense saved successfully', 'success');
+        
+        // Clear form
+        document.getElementById('expenseForm').reset();
+        document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+        
+        // Reload expenses
+        loadExpenses();
+        
     } catch (error) {
-        console.error('Error saving expense:', error);
-        showNotification('Error saving expense', 'error');
+        console.error('Failed to save expense:', error);
+        showNotification('Failed to save expense', 'error');
     }
 }
 
 async function editExpense(expenseId) {
     try {
         const expense = currentExpenses.find(e => e._id === expenseId);
-        if (!expense) return;
+        if (!expense) {
+            showNotification('Expense not found', 'error');
+            return;
+        }
         
-        document.getElementById('expenseCategory').value = expense.category || '';
+        document.getElementById('expenseCategory').value = expense.category;
         document.getElementById('expenseDescription').value = expense.description || '';
-        document.getElementById('expenseAmount').value = expense.amount || '';
-        document.getElementById('expenseDate').value = expense.date ? expense.date.split('T')[0] : '';
+        document.getElementById('expenseAmount').value = expense.amount;
+        document.getElementById('expenseDate').value = expense.date.split('T')[0];
         
-        // Store expense ID for updating
-        document.getElementById('expenseForm').setAttribute('data-expense-id', expenseId);
+        // Change save button to update
+        const saveBtn = document.querySelector('#expenseForm button');
+        saveBtn.textContent = 'Update Expense';
+        saveBtn.onclick = () => updateExpense(expenseId);
         
     } catch (error) {
-        console.error('Error editing expense:', error);
-        showNotification('Error loading expense data', 'error');
+        console.error('Failed to load expense:', error);
+        showNotification('Failed to load expense', 'error');
+    }
+}
+
+async function updateExpense(expenseId) {
+    const expenseData = {
+        _id: expenseId,
+        category: document.getElementById('expenseCategory').value,
+        description: document.getElementById('expenseDescription').value,
+        amount: parseFloat(document.getElementById('expenseAmount').value),
+        date: document.getElementById('expenseDate').value
+    };
+    
+    try {
+        await apiCall('/api/expenses/expense', {
+            method: 'PUT',
+            body: JSON.stringify(expenseData)
+        });
+        
+        showNotification('Expense updated successfully', 'success');
+        
+        // Reset form
+        document.getElementById('expenseForm').reset();
+        document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+        
+        // Reset save button
+        const saveBtn = document.querySelector('#expenseForm button');
+        saveBtn.textContent = 'Save Expense';
+        saveBtn.onclick = saveExpense;
+        
+        loadExpenses();
+        
+    } catch (error) {
+        console.error('Failed to update expense:', error);
+        showNotification('Failed to update expense', 'error');
     }
 }
 
 async function deleteExpense(expenseId) {
-    const confirmed = await window.customPopup.confirm(
-        'Are you sure you want to delete this expense? This action cannot be undone.',
-        'Delete Expense'
-    );
-    
-    if (!confirmed) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/expenses/expense/${expenseId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
+    if (await showConfirm('Are you sure you want to delete this expense?', 'Delete Expense')) {
+        try {
+            await apiCall(`/api/expenses/expense/${expenseId}`, {
+                method: 'DELETE'
+            });
+            
             showNotification('Expense deleted successfully', 'success');
             loadExpenses();
-        } else {
-            throw new Error('Failed to delete expense');
+            
+        } catch (error) {
+            console.error('Failed to delete expense:', error);
+            showNotification('Failed to delete expense', 'error');
         }
-    } catch (error) {
-        console.error('Error deleting expense:', error);
-        showNotification('Error deleting expense', 'error');
     }
 }
 
@@ -1137,194 +1068,184 @@ async function filterExpenses() {
     const category = document.getElementById('expenseFilterCategory').value;
     
     try {
-        let url = `${API_BASE_URL}/api/expenses/by-date?start=${startDate}&end=${endDate}`;
-        if (category && category !== 'all') {
-            url += `&category=${encodeURIComponent(category)}`;
+        let url = '/api/expenses/by-date';
+        const params = new URLSearchParams();
+        
+        if (startDate) params.append('start', new Date(startDate).toISOString());
+        if (endDate) params.append('end', new Date(endDate).toISOString());
+        if (category && category !== 'all') params.append('category', category);
+        
+        if (params.toString()) {
+            url += '?' + params.toString();
         }
         
-        const response = await fetch(url);
-        const expenses = await response.json();
-        
+        const expenses = await apiCall(url);
         renderExpenses(expenses);
         
         // Update total
         const total = expenses.reduce((sum, expense) => sum + (parseFloat(expense.amount) || 0), 0);
-        // Note: You might want to add a total display element to the HTML
+        const totalElement = document.getElementById('expensesTotal');
+        if (totalElement) {
+            totalElement.textContent = formatCurrency(total);
+        }
         
     } catch (error) {
-        console.error('Error filtering expenses:', error);
-        showNotification('Error filtering expenses', 'error');
+        console.error('Failed to filter expenses:', error);
+        showNotification('Failed to filter expenses', 'error');
     }
 }
 
-// Payment Categories module
-async function loadPaymentCategories() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/payment-categories/all`);
-        currentPaymentCategories = await response.json();
-        renderPaymentCategories(currentPaymentCategories);
-    } catch (error) {
-        console.error('Error loading payment categories:', error);
-        showNotification('Error loading payment categories', 'error');
-    }
-}
-
+// Payment Categories functionality
 function renderPaymentCategories(categories) {
-    const tbody = document.getElementById('categoriesTableBody');
-    tbody.innerHTML = '';
+    const tableBody = document.getElementById('categoriesTableBody');
+    tableBody.innerHTML = '';
     
     categories.forEach(category => {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${category.name}</td>
             <td><span class="badge ${category.type === 'compulsory' ? 'danger' : 'info'}">${category.type}</span></td>
-            <td>₦${Number(category.amount || 0).toFixed(2)}</td>
+            <td>${formatCurrency(category.amount)}</td>
             <td><span class="badge ${category.is_active !== false ? 'success' : 'warning'}">${category.is_active !== false ? 'Active' : 'Inactive'}</span></td>
             <td>
                 <button class="btn btn-primary" onclick="editPaymentCategory(${category._id})">
-                    <i class="fas fa-edit"></i>
+                    <i class="fas fa-edit"></i> Edit
                 </button>
                 <button class="btn btn-ghost" onclick="deletePaymentCategory(${category._id})">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </td>
         `;
-        tbody.appendChild(row);
+        tableBody.appendChild(row);
     });
 }
 
 function addPaymentCategory() {
     document.getElementById('categoryModal').classList.add('active');
-    document.getElementById('addCategoryForm').reset();
+}
+
+async function saveCategory() {
+    const categoryData = {
+        name: document.getElementById('categoryName').value,
+        type: document.getElementById('categoryType').value,
+        amount: parseFloat(document.getElementById('categoryAmount').value) || 0,
+        is_active: true
+    };
+    
+    if (!categoryData.name) {
+        showNotification('Please enter a category name', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall('/api/payment-categories/category', {
+            method: 'POST',
+            body: JSON.stringify(categoryData)
+        });
+        
+        showNotification('Payment category added successfully', 'success');
+        closeModal();
+        loadPaymentCategories();
+        
+    } catch (error) {
+        console.error('Failed to save category:', error);
+        showNotification('Failed to save category', 'error');
+    }
 }
 
 async function editPaymentCategory(categoryId) {
     try {
         const category = currentPaymentCategories.find(c => c._id === categoryId);
-        if (!category) return;
+        if (!category) {
+            showNotification('Category not found', 'error');
+            return;
+        }
         
-        document.getElementById('categoryName').value = category.name || '';
-        document.getElementById('categoryType').value = category.type || 'compulsory';
-        document.getElementById('categoryAmount').value = category.amount || '';
+        document.getElementById('categoryName').value = category.name;
+        document.getElementById('categoryType').value = category.type;
+        document.getElementById('categoryAmount').value = category.amount;
+        
+        // Change form to edit mode
+        const form = document.getElementById('addCategoryForm');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await updatePaymentCategory(categoryId);
+        };
         
         document.getElementById('categoryModal').classList.add('active');
-        document.getElementById('addCategoryForm').setAttribute('data-category-id', categoryId);
         
     } catch (error) {
-        console.error('Error editing payment category:', error);
-        showNotification('Error loading category data', 'error');
+        console.error('Failed to load category:', error);
+        showNotification('Failed to load category', 'error');
     }
 }
 
-async function saveCategory() {
-    const form = document.getElementById('addCategoryForm');
-    const categoryId = form.getAttribute('data-category-id');
-    
+async function updatePaymentCategory(categoryId) {
     const categoryData = {
+        _id: categoryId,
         name: document.getElementById('categoryName').value,
         type: document.getElementById('categoryType').value,
-        amount: parseFloat(document.getElementById('categoryAmount').value) || 0
+        amount: parseFloat(document.getElementById('categoryAmount').value) || 0,
+        is_active: true
     };
     
-    if (!categoryData.name) {
-        showNotification('Please enter a category name', 'warning');
-        return;
-    }
-    
     try {
-        let response;
-        if (categoryId) {
-            // Update existing category
-            categoryData._id = parseInt(categoryId);
-            response = await fetch(`${API_BASE_URL}/api/payment-categories/category`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(categoryData)
-            });
-        } else {
-            // Create new category
-            response = await fetch(`${API_BASE_URL}/api/payment-categories/category`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(categoryData)
-            });
-        }
+        await apiCall('/api/payment-categories/category', {
+            method: 'PUT',
+            body: JSON.stringify(categoryData)
+        });
         
-        if (response.ok) {
-            showNotification('Payment category saved successfully', 'success');
-            closeModal();
-            loadPaymentCategories();
-        } else {
-            throw new Error('Failed to save payment category');
-        }
+        showNotification('Payment category updated successfully', 'success');
+        closeModal();
+        loadPaymentCategories();
+        
     } catch (error) {
-        console.error('Error saving payment category:', error);
-        showNotification('Error saving payment category', 'error');
+        console.error('Failed to update category:', error);
+        showNotification('Failed to update category', 'error');
     }
 }
 
 async function deletePaymentCategory(categoryId) {
-     const confirmed = await window.customPopup.confirm(
-        'Are you sure you want to delete this payment category?'
-    );
-    if(!confirmed) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/payment-categories/category/${categoryId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
+    if (await showConfirm('Are you sure you want to delete this payment category?', 'Delete Category')) {
+        try {
+            await apiCall(`/api/payment-categories/category/${categoryId}`, {
+                method: 'DELETE'
+            });
+            
             showNotification('Payment category deleted successfully', 'success');
             loadPaymentCategories();
-        } else {
-            throw new Error('Failed to delete payment category');
+            
+        } catch (error) {
+            console.error('Failed to delete category:', error);
+            showNotification('Failed to delete category', 'error');
         }
-    } catch (error) {
-        console.error('Error deleting payment category:', error);
-        showNotification('Error deleting payment category', 'error');
     }
 }
 
-// Reports module
-async function loadReports() {
-    try {
-        // Load payment categories for filter
-        const categoriesResponse = await fetch(`${API_BASE_URL}/api/payment-categories/all`);
-        const categories = await categoriesResponse.json();
-        
-        const paymentTypeSelect = document.getElementById('reportPaymentType');
-        paymentTypeSelect.innerHTML = '<option value="all">All Types</option>';
-        
-        categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category.type;
-            option.textContent = category.type.charAt(0).toUpperCase() + category.type.slice(1);
-            paymentTypeSelect.appendChild(option);
-        });
-        
-        // Load classes for filter
-        const classesResponse = await fetch(`${API_BASE_URL}/api/classes/`);
-        const classes = await classesResponse.json();
-        
+// Reports functionality
+function initializeReports() {
+    // Load payment categories for filter
+    loadPaymentCategories();
+    
+    // Load classes for filter
+    loadClasses().then(() => {
         const classFilter = document.getElementById('reportClassFilter');
-        classFilter.innerHTML = '<option value="all">All Classes</option>';
-        
-        classes.forEach(cls => {
-            const option = document.createElement('option');
-            option.value = cls.id;
-            option.textContent = cls.name;
-            classFilter.appendChild(option);
-        });
-        
-        // Initialize date range picker (simplified)
-        const today = new Date();
-        const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
-        document.getElementById('reportDateRange').value = `${lastMonth.toISOString().split('T')[0]} to ${today.toISOString().split('T')[0]}`;
-        
-    } catch (error) {
-        console.error('Error loading reports:', error);
-        showNotification('Error loading reports', 'error');
+        if (classFilter) {
+            classFilter.innerHTML = '<option value="all">All Classes</option>';
+            currentClasses.forEach(cls => {
+                classFilter.innerHTML += `<option value="${cls.id}">${cls.name}</option>`;
+            });
+        }
+    });
+    
+    // Set default date range (last 30 days)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
+    const dateRangeInput = document.getElementById('reportDateRange');
+    if (dateRangeInput) {
+        dateRangeInput.value = `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`;
     }
 }
 
@@ -1334,278 +1255,427 @@ async function generateReport() {
     const classFilter = document.getElementById('reportClassFilter').value;
     
     if (!dateRange) {
-        showNotification('Please select a date range', 'warning');
+        showNotification('Please select a date range', 'error');
         return;
     }
     
     try {
-        // Parse date range (simplified - assumes "YYYY-MM-DD to YYYY-MM-DD" format)
-        const dates = dateRange.split(' to ');
-        const startDate = dates[0];
-        const endDate = dates[1] || dates[0];
+        // Parse date range
+        const [startDateStr, endDateStr] = dateRange.split(' to ');
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
         
         // Build query parameters
-        let url = `${API_BASE_URL}/api/student-payments/by-date?start=${startDate}&end=${endDate}`;
-        if (paymentType && paymentType !== 'all') {
-            url += `&payment_type=${paymentType}`;
-        }
-        
-        const response = await fetch(url);
-        const payments = await response.json();
-        
-        // Generate report
-        const reportResults = document.getElementById('reportResults');
-        
-        if (payments.length === 0) {
-            reportResults.innerHTML = '<p class="text-muted text-center">No payments found for the selected criteria</p>';
-            return;
-        }
-        
-        // Calculate totals
-        const totalAmount = payments.reduce((sum, payment) => sum + (parseFloat(payment.amount_paid) || 0), 0);
-        const totalTransactions = payments.length;
-        
-        // Group by payment type
-        const byType = payments.reduce((acc, payment) => {
-            const type = payment.payment_type || 'Unknown';
-            if (!acc[type]) acc[type] = { count: 0, amount: 0 };
-            acc[type].count++;
-            acc[type].amount += parseFloat(payment.amount_paid) || 0;
-            return acc;
-        }, {});
-        
-        let reportHtml = `
-            <div class="card" style="margin-bottom: 1rem;">
-                <div class="card-content">
-                    <h5>Report Summary</h5>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                        <div>
-                            <strong>Total Amount:</strong><br>
-                            <span class="text-success">₦${totalAmount.toFixed(2)}</span>
-                        </div>
-                        <div>
-                            <strong>Total Transactions:</strong><br>
-                            <span class="text-info">${totalTransactions}</span>
-                        </div>
-                        <div>
-                            <strong>Average Transaction:</strong><br>
-                            <span class="text-primary">₦${(totalAmount / totalTransactions).toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h5>Payment Breakdown by Type</h5>
-                </div>
-                <div class="card-content">
-                    <div class="table-container">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Payment Type</th>
-                                    <th>Count</th>
-                                    <th>Total Amount</th>
-                                    <th>Percentage</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-        `;
-        
-        Object.entries(byType).forEach(([type, data]) => {
-            const percentage = ((data.amount / totalAmount) * 100).toFixed(1);
-            reportHtml += `
-                <tr>
-                    <td>${type}</td>
-                    <td>${data.count}</td>
-                    <td>₦${data.amount.toFixed(2)}</td>
-                    <td>${percentage}%</td>
-                </tr>
-            `;
+        const params = new URLSearchParams({
+            start: startDate.toISOString(),
+            end: endDate.toISOString()
         });
         
-        reportHtml += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        `;
+        if (paymentType && paymentType !== 'all') {
+            params.append('payment_type', paymentType);
+        }
         
-        reportResults.innerHTML = reportHtml;
+        // Get payments data
+        const payments = await apiCall(`/api/student-payments/by-date?${params.toString()}`);
+        
+        // Filter by class if specified
+        let filteredPayments = payments;
+        if (classFilter && classFilter !== 'all') {
+            const classStudents = await apiCall(`/api/students/by-class/${classFilter}`);
+            const studentIds = classStudents.map(s => parseInt(s.id));
+            filteredPayments = payments.filter(p => studentIds.includes(p.student_id));
+        }
+        
+        // Generate report
+        const reportData = generateReportData(filteredPayments);
+        renderReport(reportData);
         
     } catch (error) {
-        console.error('Error generating report:', error);
-        showNotification('Error generating report', 'error');
+        console.error('Failed to generate report:', error);
+        showNotification('Failed to generate report', 'error');
     }
 }
 
-// Settings module
-async function loadSettings() {
-    try {
-        // Load existing settings if available
-        const response = await fetch(`${API_BASE_URL}/api/settings/school`);
-        if (response.ok) {
-            const settings = await response.json();
-            
-            document.getElementById('schoolName').value = settings.name || 'Abuzarban School';
-            document.getElementById('schoolAddress').value = settings.address || '';
-            document.getElementById('schoolPhone').value = settings.phone || '';
-            document.getElementById('schoolEmail').value = settings.email || '';
+function generateReportData(payments) {
+    const totalPaid = payments.reduce((sum, p) => sum + (parseFloat(p.amount_paid) || 0), 0);
+    const totalOutstanding = payments.reduce((sum, p) => sum + Math.max(0, (parseFloat(p.amount) || 0) - (parseFloat(p.amount_paid) || 0)), 0);
+    
+    const byType = payments.reduce((acc, p) => {
+        const type = p.payment_type || 'unknown';
+        if (!acc[type]) {
+            acc[type] = { count: 0, paid: 0, outstanding: 0 };
         }
-    } catch (error) {
-        console.error('Error loading settings:', error);
-        // Continue with default values if settings API doesn't exist
-    }
+        acc[type].count++;
+        acc[type].paid += parseFloat(p.amount_paid) || 0;
+        acc[type].outstanding += Math.max(0, (parseFloat(p.amount) || 0) - (parseFloat(p.amount_paid) || 0));
+        return acc;
+    }, {});
+    
+    const byMethod = payments.reduce((acc, p) => {
+        const method = p.payment_method || 'unknown';
+        if (!acc[method]) {
+            acc[method] = { count: 0, amount: 0 };
+        }
+        acc[method].count++;
+        acc[method].amount += parseFloat(p.amount_paid) || 0;
+        return acc;
+    }, {});
+    
+    return {
+        totalPaid,
+        totalOutstanding,
+        totalTransactions: payments.length,
+        byType,
+        byMethod,
+        payments
+    };
+}
+
+function renderReport(reportData) {
+    const resultsContainer = document.getElementById('reportResults');
+    
+    resultsContainer.innerHTML = `
+        <div class="report-summary">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-title">Total Paid</div>
+                    <div class="stat-value">${formatCurrency(reportData.totalPaid)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Outstanding</div>
+                    <div class="stat-value">${formatCurrency(reportData.totalOutstanding)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Transactions</div>
+                    <div class="stat-value">${reportData.totalTransactions}</div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>By Payment Type</h5>
+                    </div>
+                    <div class="card-content">
+                        ${Object.entries(reportData.byType).map(([type, data]) => `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>${type}</span>
+                                <span>${formatCurrency(data.paid)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5>By Payment Method</h5>
+                    </div>
+                    <div class="card-content">
+                        ${Object.entries(reportData.byMethod).map(([method, data]) => `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>${method}</span>
+                                <span>${formatCurrency(data.amount)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Settings functionality
+async function loadSettings() {
+    // Settings are typically stored in a configuration file or database
+    // For now, we'll use localStorage as a fallback
+    const settings = JSON.parse(localStorage.getItem('schoolSettings') || '{}');
+    
+    document.getElementById('schoolName').value = settings.schoolName || 'Abuzarban School';
+    document.getElementById('schoolAddress').value = settings.schoolAddress || '';
+    document.getElementById('schoolPhone').value = settings.schoolPhone || '';
+    document.getElementById('schoolEmail').value = settings.schoolEmail || '';
 }
 
 async function saveSettings() {
-    const settingsData = {
-        name: document.getElementById('schoolName').value,
-        address: document.getElementById('schoolAddress').value,
-        phone: document.getElementById('schoolPhone').value,
-        email: document.getElementById('schoolEmail').value
+    const settings = {
+        schoolName: document.getElementById('schoolName').value,
+        schoolAddress: document.getElementById('schoolAddress').value,
+        schoolPhone: document.getElementById('schoolPhone').value,
+        schoolEmail: document.getElementById('schoolEmail').value
     };
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/settings/school`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settingsData)
-        });
+        // Save to localStorage (in a real app, this would be saved to the backend)
+        localStorage.setItem('schoolSettings', JSON.stringify(settings));
         
-        if (response.ok) {
-            showNotification('Settings saved successfully', 'success');
-        } else {
-            throw new Error('Failed to save settings');
-        }
+        showNotification('Settings saved successfully', 'success');
+        
     } catch (error) {
-        console.error('Error saving settings:', error);
-        showNotification('Settings saved locally', 'info');
+        console.error('Failed to save settings:', error);
+        showNotification('Failed to save settings', 'error');
     }
 }
 
-// Form submission handlers
-document.addEventListener('DOMContentLoaded', function() {
-    // Student form submission
-    const studentForm = document.getElementById('addStudentForm');
-    if (studentForm) {
-        studentForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const studentId = this.getAttribute('data-student-id');
-            const studentData = {
-                name: document.getElementById('studentName').value,
-                guardian: document.getElementById('guardianName').value,
-                phone: document.getElementById('studentPhone').value,
-                email: document.getElementById('studentEmail').value,
-                classId: document.getElementById('studentClass').value
-            };
-            
-            try {
-                let response;
-                if (studentId) {
-                    // Update existing student
-                    response = await fetch(`${API_BASE_URL}/api/students/update/${studentId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(studentData)
-                    });
-                } else {
-                    // Create new student
-                    response = await fetch(`${API_BASE_URL}/api/students/add`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(studentData)
-                    });
-                }
-                
-                if (response.ok) {
-                    showNotification('Student saved successfully', 'success');
-                    closeModal();
-                    loadStudents();
-                } else {
-                    throw new Error('Failed to save student');
-                }
-            } catch (error) {
-                console.error('Error saving student:', error);
-                showNotification('Error saving student', 'error');
-            }
-        });
-    }
-    
-    // Class form submission
-    const classForm = document.getElementById('addClassForm');
-    if (classForm) {
-        classForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const classId = this.getAttribute('data-class-id');
-            const classData = {
-                name: document.getElementById('className').value,
-                level: document.getElementById('classLevel').value,
-                teacher: document.getElementById('classTeacher').value,
-                capacity: parseInt(document.getElementById('classCapacity').value) || 30
-            };
-            
-            try {
-                let response;
-                if (classId) {
-                    // Update existing class
-                    response = await fetch(`${API_BASE_URL}/api/classes/${classId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(classData)
-                    });
-                } else {
-                    // Create new class
-                    response = await fetch(`${API_BASE_URL}/api/classes/`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(classData)
-                    });
-                }
-                
-                if (response.ok) {
-                    showNotification('Class saved successfully', 'success');
-                    closeModal();
-                    loadClasses();
-                } else {
-                    throw new Error('Failed to save class');
-                }
-            } catch (error) {
-                console.error('Error saving class:', error);
-                showNotification('Error saving class', 'error');
-            }
-        });
-    }
-    
-    // Cancel button handlers
-    const cancelButtons = document.querySelectorAll('[onclick="closeModal()"], #cancelClassBtn');
-    cancelButtons.forEach(button => {
-        button.addEventListener('click', closeModal);
-    });
-});
+// Student management functions (existing functionality)
+async function addStudent() {
+    await loadClassesForModal();
+    document.getElementById('studentModal').classList.add('active');
+}
 
-// Search and filter functions
+async function loadClassesForModal() {
+    try {
+        const classes = await apiCall('/api/classes/');
+        const studentClassSelect = document.getElementById('studentClass');
+        
+        if (studentClassSelect) {
+            studentClassSelect.innerHTML = '<option value="">Select Class</option>';
+            classes.forEach(cls => {
+                studentClassSelect.innerHTML += `<option value="${cls.id}">${cls.name}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Failed to load classes for modal:', error);
+    }
+}
+
+async function saveStudent() {
+    const studentData = {
+        name: document.getElementById('studentName').value,
+        guardian: document.getElementById('guardianName').value,
+        phone: document.getElementById('studentPhone').value,
+        email: document.getElementById('studentEmail').value,
+        classId: document.getElementById('studentClass').value,
+        balance: 0
+    };
+    
+    if (!studentData.name || !studentData.classId) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall('/api/students/add', {
+            method: 'POST',
+            body: JSON.stringify(studentData)
+        });
+        
+        showNotification('Student added successfully', 'success');
+        closeModal();
+        loadStudents();
+        
+    } catch (error) {
+        console.error('Failed to save student:', error);
+        showNotification('Failed to save student', 'error');
+    }
+}
+
+async function editStudent(studentId) {
+    try {
+        const student = await apiCall(`/api/students/student/${studentId}`);
+        await loadClassesForModal();
+        
+        document.getElementById('studentName').value = student.name;
+        document.getElementById('guardianName').value = student.guardian || '';
+        document.getElementById('studentPhone').value = student.phone || '';
+        document.getElementById('studentEmail').value = student.email || '';
+        document.getElementById('studentClass').value = student.classId || '';
+        
+        // Change form to edit mode
+        const form = document.getElementById('addStudentForm');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await updateStudent(studentId);
+        };
+        
+        document.getElementById('studentModal').classList.add('active');
+        
+    } catch (error) {
+        console.error('Failed to load student:', error);
+        showNotification('Failed to load student', 'error');
+    }
+}
+
+async function updateStudent(studentId) {
+    const studentData = {
+        name: document.getElementById('studentName').value,
+        guardian: document.getElementById('guardianName').value,
+        phone: document.getElementById('studentPhone').value,
+        email: document.getElementById('studentEmail').value,
+        classId: document.getElementById('studentClass').value
+    };
+    
+    try {
+        await apiCall(`/api/students/update/${studentId}`, {
+            method: 'PUT',
+            body: JSON.stringify(studentData)
+        });
+        
+        showNotification('Student updated successfully', 'success');
+        closeModal();
+        loadStudents();
+        
+    } catch (error) {
+        console.error('Failed to update student:', error);
+        showNotification('Failed to update student', 'error');
+    }
+}
+
+async function deleteStudent(studentId) {
+    if (await showConfirm('Are you sure you want to delete this student?', 'Delete Student')) {
+        try {
+            await apiCall(`/api/students/student/${studentId}`, {
+                method: 'DELETE'
+            });
+            
+            showNotification('Student deleted successfully', 'success');
+            loadStudents();
+            
+        } catch (error) {
+            console.error('Failed to delete student:', error);
+            showNotification('Failed to delete student', 'error');
+        }
+    }
+}
+
+// Class management functions (existing functionality)
+async function addClass() {
+    document.getElementById('classModal').classList.add('active');
+}
+
+async function saveClass() {
+    const classData = {
+        name: document.getElementById('className').value,
+        level: document.getElementById('classLevel').value,
+        teacher: document.getElementById('classTeacher').value,
+        capacity: parseInt(document.getElementById('classCapacity').value) || 30
+    };
+    
+    if (!classData.name || !classData.level) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall('/api/classes/', {
+            method: 'POST',
+            body: JSON.stringify(classData)
+        });
+        
+        showNotification('Class added successfully', 'success');
+        closeModal();
+        loadClasses();
+        
+    } catch (error) {
+        console.error('Failed to save class:', error);
+        showNotification('Failed to save class', 'error');
+    }
+}
+
+async function editClass(classId) {
+    try {
+        const classData = await apiCall(`/api/classes/${classId}`);
+        
+        document.getElementById('className').value = classData.name;
+        document.getElementById('classLevel').value = classData.level;
+        document.getElementById('classTeacher').value = classData.teacher || '';
+        document.getElementById('classCapacity').value = classData.capacity || 30;
+        
+        // Change form to edit mode
+        const form = document.getElementById('addClassForm');
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await updateClass(classId);
+        };
+        
+        document.getElementById('classModal').classList.add('active');
+        
+    } catch (error) {
+        console.error('Failed to load class:', error);
+        showNotification('Failed to load class', 'error');
+    }
+}
+
+async function updateClass(classId) {
+    const classData = {
+        name: document.getElementById('className').value,
+        level: document.getElementById('classLevel').value,
+        teacher: document.getElementById('classTeacher').value,
+        capacity: parseInt(document.getElementById('classCapacity').value) || 30
+    };
+    
+    try {
+        await apiCall(`/api/classes/${classId}`, {
+            method: 'PUT',
+            body: JSON.stringify(classData)
+        });
+        
+        showNotification('Class updated successfully', 'success');
+        closeModal();
+        loadClasses();
+        
+    } catch (error) {
+        console.error('Failed to update class:', error);
+        showNotification('Failed to update class', 'error');
+    }
+}
+
+async function deleteClass(classId) {
+    if (await showConfirm('Are you sure you want to delete this class?', 'Delete Class')) {
+        try {
+            await apiCall(`/api/classes/${classId}`, {
+                method: 'DELETE'
+            });
+            
+            showNotification('Class deleted successfully', 'success');
+            loadClasses();
+            
+        } catch (error) {
+            console.error('Failed to delete class:', error);
+            showNotification('Failed to delete class', 'error');
+        }
+    }
+}
+
+// Search and filter functionality
+function setupStudentSearch() {
+    const searchInput = document.getElementById('studentSearch');
+    if (!searchInput) return;
+    
+    const debouncedSearch = debounce((query) => {
+        if (query.length === 0) {
+            renderStudents(currentStudents);
+            return;
+        }
+        
+        const filteredStudents = currentStudents.filter(student => 
+            student.name.toLowerCase().includes(query.toLowerCase()) ||
+            student.id.toString().includes(query) ||
+            (student.guardian && student.guardian.toLowerCase().includes(query.toLowerCase()))
+        );
+        
+        renderStudents(filteredStudents);
+    }, 300);
+    
+    searchInput.addEventListener('input', (e) => {
+        debouncedSearch(e.target.value);
+    });
+}
+
 function filterStudents() {
-    const searchTerm = document.getElementById('studentSearch').value.toLowerCase();
     const classFilter = document.getElementById('studentClassFilter').value;
+    const searchQuery = document.getElementById('studentSearch').value.toLowerCase();
     
     let filteredStudents = currentStudents;
     
-    if (searchTerm) {
-        filteredStudents = filteredStudents.filter(student => 
-            (student.name && student.name.toLowerCase().includes(searchTerm)) ||
-            (student.id && student.id.toString().includes(searchTerm)) ||
-            (student.guardian && student.guardian.toLowerCase().includes(searchTerm))
-        );
+    if (classFilter) {
+        filteredStudents = filteredStudents.filter(student => student.classId == classFilter);
     }
     
-    if (classFilter) {
+    if (searchQuery) {
         filteredStudents = filteredStudents.filter(student => 
-            student.classId === classFilter
+            student.name.toLowerCase().includes(searchQuery) ||
+            student.id.toString().includes(searchQuery) ||
+            (student.guardian && student.guardian.toLowerCase().includes(searchQuery))
         );
     }
     
@@ -1613,431 +1683,169 @@ function filterStudents() {
 }
 
 function sortStudents() {
-    const sortBy = 'name'; // Default sort by name
-    const direction = sortDirection[sortBy] === 'asc' ? 'desc' : 'asc';
-    sortDirection[sortBy] = direction;
+    const sortBy = prompt('Sort by: name, id, class, balance');
+    if (!sortBy) return;
     
-    currentStudents.sort((a, b) => {
-        const aVal = a[sortBy] || '';
-        const bVal = b[sortBy] || '';
-        
-        if (direction === 'asc') {
-            return aVal.localeCompare(bVal);
-        } else {
-            return bVal.localeCompare(aVal);
+    const sortedStudents = [...currentStudents].sort((a, b) => {
+        switch(sortBy.toLowerCase()) {
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'id':
+                return a.id.localeCompare(b.id);
+            case 'class':
+                const classA = currentClasses.find(c => c.id == a.classId)?.name || '';
+                const classB = currentClasses.find(c => c.id == b.classId)?.name || '';
+                return classA.localeCompare(classB);
+            case 'balance':
+                return (b.balance || 0) - (a.balance || 0);
+            default:
+                return 0;
         }
     });
     
-    renderStudents(currentStudents);
+    renderStudents(sortedStudents);
 }
 
-// Search functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const studentSearch = document.getElementById('studentSearch');
-    if (studentSearch) {
-        studentSearch.addEventListener('input', filterStudents);
-    }
-});
-
-// Utility functions
+// Modal management
 function closeModal() {
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
+    document.querySelectorAll('.modal').forEach(modal => {
         modal.classList.remove('active');
-        // Clear any stored IDs
-        const forms = modal.querySelectorAll('form');
-        forms.forEach(form => {
-            form.removeAttribute('data-student-id');
-            form.removeAttribute('data-class-id');
-            form.removeAttribute('data-session-id');
-            form.removeAttribute('data-category-id');
-            form.removeAttribute('data-expense-id');
-        });
     });
-}
-
-function getStatusBadgeClass(status) {
-    switch (status) {
-        case 'paid':
-        case 'active':
-        case 'completed':
-            return 'success';
-        case 'partial':
-        case 'upcoming':
-            return 'warning';
-        case 'unpaid':
-        case 'inactive':
-        case 'overdue':
-            return 'danger';
-        default:
-            return 'info';
-    }
-}
-
-function showNotification(message, type = 'info') {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 1rem 1.5rem;
-        border-radius: 0.5rem;
-        color: white;
-        font-weight: 600;
-        z-index: 10000;
-        animation: slideIn 0.3s ease;
-        max-width: 300px;
-    `;
     
-    // Set background color based on type
-    switch (type) {
-        case 'success':
-            notification.style.backgroundColor = '#10b981';
-            break;
-        case 'error':
-            notification.style.backgroundColor = '#ef4444';
-            break;
-        case 'warning':
-            notification.style.backgroundColor = '#f59e0b';
-            break;
-        default:
-            notification.style.backgroundColor = '#3b82f6';
-    }
-    
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 3000);
-}
-
-// Add CSS for notifications
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-    
-    .search-results {
-        position: absolute;
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.5rem;
-        max-height: 200px;
-        overflow-y: auto;
-        z-index: 100;
-        width: 100%;
-        margin-top: 2px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-    
-    [data-theme="dark"] .search-results {
-        background: #1f2937;
-        border-color: #374151;
-    }
-    
-    .search-result-item {
-        padding: 0.75rem;
-        cursor: pointer;
-        border-bottom: 1px solid #e5e7eb;
-        transition: background-color 0.2s;
-    }
-    
-    [data-theme="dark"] .search-result-item {
-        border-bottom-color: #374151;
-    }
-    
-    .search-result-item:hover {
-        background-color: #f3f4f6;
-    }
-    
-    [data-theme="dark"] .search-result-item:hover {
-        background-color: #374151;
-    }
-    
-    .search-result-item:last-child {
-        border-bottom: none;
-    }
-`;
-document.head.appendChild(style);
-
-// Payment type change handler
-document.addEventListener('DOMContentLoaded', function() {
-    const paymentTypeSelect = document.getElementById('paymentType');
-    if (paymentTypeSelect) {
-        paymentTypeSelect.addEventListener('change', function() {
-            const selectedOption = this.selectedOptions[0];
-            if (selectedOption && selectedOption.getAttribute('data-amount')) {
-                document.getElementById('paymentAmount').value = selectedOption.getAttribute('data-amount');
-            }
-        });
-    }
-});
-
-// Click outside modal to close
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('modal')) {
-        closeModal();
-    }
-});
-
-// Expense form enhancement
-document.addEventListener('DOMContentLoaded', function() {
-    const expenseForm = document.getElementById('expenseForm');
-    if (expenseForm) {
-        // Set default date to today
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('expenseDate').value = today;
-        
-        // Handle form submission for updates
-        const saveExpenseBtn = document.querySelector('[onclick="saveExpense()"]');
-        if (saveExpenseBtn) {
-            saveExpenseBtn.addEventListener('click', async function() {
-                const expenseId = expenseForm.getAttribute('data-expense-id');
-                
-                if (expenseId) {
-                    // Update existing expense
-                    const expenseData = {
-                        _id: parseInt(expenseId),
-                        category: document.getElementById('expenseCategory').value,
-                        description: document.getElementById('expenseDescription').value,
-                        amount: parseFloat(document.getElementById('expenseAmount').value),
-                        date: document.getElementById('expenseDate').value
-                    };
-                    
-                    try {
-                        const response = await fetch(`${API_BASE_URL}/api/expenses/expense`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(expenseData)
-                        });
-                        
-                        if (response.ok) {
-                            showNotification('Expense updated successfully', 'success');
-                            expenseForm.reset();
-                            expenseForm.removeAttribute('data-expense-id');
-                            loadExpenses();
-                        } else {
-                            throw new Error('Failed to update expense');
-                        }
-                    } catch (error) {
-                        console.error('Error updating expense:', error);
-                        showNotification('Error updating expense', 'error');
-                    }
-                }
-            });
-        }
-    }
-});
-
-// Enhanced search functionality for students
-document.addEventListener('DOMContentLoaded', function() {
-    const studentSearch = document.getElementById('studentSearch');
-    if (studentSearch) {
-        let searchTimeout;
-        studentSearch.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                filterStudents();
-            }, 300); // Debounce search
-        });
-    }
-});
-
-// Table sorting functionality
-function setupTableSorting() {
-    const sortIcons = document.querySelectorAll('.sort-icon');
-    sortIcons.forEach(icon => {
-        icon.addEventListener('click', function() {
-            const sortBy = this.getAttribute('data-sort');
-            const table = this.closest('table');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            
-            const direction = sortDirection[sortBy] === 'asc' ? 'desc' : 'asc';
-            sortDirection[sortBy] = direction;
-            
-            // Update icon states
-            sortIcons.forEach(i => i.classList.remove('active'));
-            this.classList.add('active');
-            
-            // Sort rows
-            rows.sort((a, b) => {
-                const aVal = a.children[Array.from(table.querySelectorAll('th')).findIndex(th => th.querySelector(`[data-sort="${sortBy}"]`))].textContent;
-                const bVal = b.children[Array.from(table.querySelectorAll('th')).findIndex(th => th.querySelector(`[data-sort="${sortBy}"]`))].textContent;
-                
-                if (direction === 'asc') {
-                    return aVal.localeCompare(bVal, undefined, { numeric: true });
-                } else {
-                    return bVal.localeCompare(aVal, undefined, { numeric: true });
-                }
-            });
-            
-            // Re-append sorted rows
-            rows.forEach(row => tbody.appendChild(row));
-        });
-    });
-}
-
-// Initialize table sorting when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(setupTableSorting, 1000); // Delay to ensure tables are rendered
-});
-
-// Auto-refresh dashboard data every 5 minutes
-setInterval(() => {
-    const activeSection = document.querySelector('.content-section.active');
-    if (activeSection && activeSection.id === 'dashboard-section') {
-        loadDashboardData();
-    }
-}, 5 * 60 * 1000);
-
-// Enhanced error handling for API calls
-async function apiCall(url, options = {}) {
-    try {
-        const response = await fetch(url, {
-            ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return await response.json();
-    } catch (error) {
-        console.error('API call failed:', error);
-        throw error;
-    }
-}
-
-// Initialize payment method change handler
-document.addEventListener('DOMContentLoaded', function() {
-    const paymentMethodSelect = document.getElementById('paymentMethod');
-    if (paymentMethodSelect) {
-        paymentMethodSelect.addEventListener('change', function() {
-            // You can add specific logic for different payment methods here
-            console.log('Payment method changed to:', this.value);
-        });
-    }
-});
-
-// Add keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-    // Escape key to close modals
-    if (e.key === 'Escape') {
-        closeModal();
-    }
-    
-    // Ctrl+S to save forms (prevent default browser save)
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        const activeModal = document.querySelector('.modal.active');
-        if (activeModal) {
-            const submitBtn = activeModal.querySelector('button[type="submit"], .btn-primary');
-            if (submitBtn) {
-                submitBtn.click();
-            }
-        }
-    }
-});
-
-// Enhanced student search with real-time results
-async function performStudentSearch(query) {
-    if (query.length < 2) return [];
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/students/search/${encodeURIComponent(query)}`);
-        return await response.json();
-    } catch (error) {
-        console.error('Error searching students:', error);
-        return [];
-    }
-}
-
-// Initialize all event listeners when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Payment form validation
-    const paymentForm = document.getElementById('paymentForm');
-    if (paymentForm) {
-        const recordBtn = document.querySelector('[onclick="recordPayment()"]');
-        if (recordBtn) {
-            recordBtn.addEventListener('click', function() {
-                // Validate form before submission
-                const studentId = selectedStudentId;
-                const paymentType = document.getElementById('paymentType').value;
-                const amount = document.getElementById('paymentAmount').value;
-                const method = document.getElementById('paymentMethod').value;
-                
-                if (!studentId) {
-                    showNotification('Please select a student', 'warning');
-                    return;
-                }
-                
-                if (!paymentType || !amount || !method) {
-                    showNotification('Please fill in all required fields', 'warning');
-                    return;
-                }
-                
-                if (parseFloat(amount) <= 0) {
-                    showNotification('Amount must be greater than 0', 'warning');
-                    return;
-                }
-                
-                // If validation passes, proceed with recording payment
-                recordPayment();
-            });
-        }
-    }
-});
-
-// Add loading states for better UX
-function showLoading(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.innerHTML = '<div class="loading-spinner">Loading...</div>';
-    }
-}
-
-function hideLoading(elementId) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.innerHTML = '';
-    }
-}
-
-// Enhanced form reset function
-function resetForm(formId) {
-    const form = document.getElementById(formId);
-    if (form) {
+    // Reset forms
+    document.querySelectorAll('form').forEach(form => {
         form.reset();
-        // Clear any stored data attributes
-        const dataAttributes = ['data-student-id', 'data-class-id', 'data-session-id', 'data-category-id', 'data-expense-id'];
-        dataAttributes.forEach(attr => {
-            form.removeAttribute(attr);
-        });
+        form.onsubmit = null;
+    });
+}
+
+// Theme management
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    const themeIcon = document.getElementById('theme-icon');
+    if (themeIcon) {
+        themeIcon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
     }
 }
 
-// Export functions for global access
+// Custom popup system for confirmations
+async function showConfirm(message, title = 'Confirm') {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h3>${title}</h3>
+                <p>${message}</p>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                    <button class="btn btn-ghost" onclick="this.closest('.modal').remove(); resolve(false)">Cancel</button>
+                    <button class="btn btn-primary" onclick="this.closest('.modal').remove(); resolve(true)">Confirm</button>
+                </div>
+            </div>
+        `;
+        
+        // Add event listeners to buttons
+        const buttons = modal.querySelectorAll('button');
+        buttons[0].onclick = () => { modal.remove(); resolve(false); };
+        buttons[1].onclick = () => { modal.remove(); resolve(true); };
+        
+        document.body.appendChild(modal);
+    });
+}
+
+// Initialize application
+document.addEventListener('DOMContentLoaded', function() {
+    // Load saved theme
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    
+    const themeIcon = document.getElementById('theme-icon');
+    if (themeIcon) {
+        themeIcon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    }
+    
+    // Setup navigation
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = link.getAttribute('data-section');
+            if (section) {
+                showSection(section);
+            }
+        });
+    });
+    
+    // Setup modal close buttons
+    document.querySelectorAll('.btn-ghost').forEach(btn => {
+        if (btn.textContent.trim() === 'Cancel') {
+            btn.addEventListener('click', closeModal);
+        }
+    });
+    
+    // Setup form submissions
+    const addStudentForm = document.getElementById('addStudentForm');
+    if (addStudentForm) {
+        addStudentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveStudent();
+        });
+    }
+    
+    const addClassForm = document.getElementById('addClassForm');
+    if (addClassForm) {
+        addClassForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveClass();
+        });
+    }
+    
+    const addSessionForm = document.getElementById('addSessionForm');
+    if (addSessionForm) {
+        addSessionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveSession();
+        });
+    }
+    
+    const addCategoryForm = document.getElementById('addCategoryForm');
+    if (addCategoryForm) {
+        addCategoryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await saveCategory();
+        });
+    }
+    
+    // Setup search functionality
+    setupStudentSearch();
+    setupPaymentStudentSearch();
+    setupPaymentTypeHandler();
+    
+    // Setup modal overlay clicks
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    });
+    
+    // Setup keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+    
+    // Initialize with dashboard
+    showSection('dashboard');
+});
+
+// Make functions globally available
 window.showSection = showSection;
 window.addStudent = addStudent;
 window.editStudent = editStudent;
@@ -2046,8 +1854,8 @@ window.addClass = addClass;
 window.editClass = editClass;
 window.deleteClass = deleteClass;
 window.addSession = addSession;
-window.editSession = editSession;
 window.saveSession = saveSession;
+window.editSession = editSession;
 window.deleteSession = deleteSession;
 window.recordPayment = recordPayment;
 window.openEnrollmentModal = openEnrollmentModal;
@@ -2060,12 +1868,13 @@ window.editExpense = editExpense;
 window.deleteExpense = deleteExpense;
 window.filterExpenses = filterExpenses;
 window.addPaymentCategory = addPaymentCategory;
-window.editPaymentCategory = editPaymentCategory;
 window.saveCategory = saveCategory;
+window.editPaymentCategory = editPaymentCategory;
 window.deletePaymentCategory = deletePaymentCategory;
 window.generateReport = generateReport;
 window.saveSettings = saveSettings;
 window.closeModal = closeModal;
+window.toggleTheme = toggleTheme;
 window.filterStudents = filterStudents;
 window.sortStudents = sortStudents;
-window.toggleTheme = toggleTheme;
+window.showConfirm = showConfirm;

@@ -3,7 +3,7 @@ const server = require("http").Server(app);
 const bodyParser = require("body-parser");
 const Datastore = require("nedb");
 const async = require("async");
-const { getNeDbFilePath, ensureDataDirsExist } = require("./dbUtil");
+const { getNeDbFilePath, ensureDataDirsExist } = require("../dbUtil");
 
 app.use(bodyParser.json());
 
