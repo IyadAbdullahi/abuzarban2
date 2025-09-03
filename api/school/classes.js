@@ -1,7 +1,7 @@
 const express = require("express");
 const Datastore = require("nedb");
 const { getNeDbFilePath, ensureDataDirsExist } = require("../dbUtil");
-
+const { studentDB } = require('./students');
 const app = express();
 app.use(express.json());
 
@@ -13,11 +13,30 @@ const classesDB = new Datastore({
 
 // Get all classes
 app.get("/", (req, res) => {
-  classesDB.find({}, (err, docs) => {
+  classesDB.find({}, (err, classes) => {
     if (err) return res.status(500).send(err);
-    res.send(docs);
+
+    studentDB.find({}, (err2, students) => {
+      if (err2) return res.status(500).send(err2);
+
+      // Count students per class_id
+      const classCounts = students.reduce((acc, s) => {
+        const cid = s.classId;
+        acc[cid] = (acc[cid] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Attach count to each class
+      const result = classes.map(cls => ({
+        ...cls,
+        studentCount: classCounts[cls.id] || 0
+      }));
+
+      res.send(result);
+    });
   });
 });
+
 
 // Get a class by ID
 app.get("/:id", (req, res) => {
